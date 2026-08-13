@@ -18,10 +18,12 @@ MAX_ENTRIES = 5000
 MAX_TOTAL = 512 * 1024 * 1024
 MAX_MEMBER = 100 * 1024 * 1024
 MAX_IMAGE = 5 * 1024 * 1024
-MAX_ARCHIVE = 100 * 1000 * 1000
 HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 PLUGIN_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+APP_ID = re.compile(
+    r"^(?:(?:plugin_)?asdk_app_|connector_|templated_apps_)[A-Za-z0-9][A-Za-z0-9_-]*$"
+)
 CATEGORIES = {
     "Productivity", "Creativity", "Developer Tools", "Business & Operations",
     "Data & Analytics", "Communication", "Education & Research", "Security",
@@ -42,14 +44,18 @@ def _error(errors: list[str], message: str) -> None:
     errors.append(message)
 
 
-def _load_json(path: Path, errors: list[str]) -> dict:
+def _warning(warnings: list[str], message: str) -> None:
+    warnings.append(message)
+
+
+def _load_json(path: Path, errors: list[str], label: str = "manifest") -> dict:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
-        _error(errors, f"manifest unreadable: {exc}")
+        _error(errors, f"{label} unreadable or malformed: {exc}")
         return {}
     if not isinstance(value, dict):
-        _error(errors, "manifest must be a JSON object")
+        _error(errors, f"{label} must be a JSON object")
         return {}
     return value
 
@@ -82,7 +88,63 @@ def _public_https(value: object, field: str, errors: list[str], limit: int = 204
         _error(errors, f"{field} must be an HTTPS URL without embedded credentials")
 
 
-def _component_path(root: Path, manifest: dict, field: str, expected: str, errors: list[str], required: bool = False) -> bool:
+def _has_control(value: str) -> bool:
+    return any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+
+
+def _relative_file_path(
+    root: Path,
+    field: str,
+    value: object,
+    errors: list[str],
+    *,
+    required: bool = False,
+    require_dot_prefix: bool = True,
+) -> Path | None:
+    if value is None:
+        if required:
+            _error(errors, f"{field} is required")
+        return None
+    if not isinstance(value, str) or not value:
+        _error(errors, f"{field} must be a non-empty relative file path")
+        return None
+    if value != value.strip():
+        _error(errors, f"{field} path must not contain outer whitespace: {value!r}")
+    if _has_control(value):
+        _error(errors, f"{field} path contains a control character")
+    if require_dot_prefix and not value.startswith("./"):
+        _error(errors, f"{field} path must start with ./: {value}")
+    if value.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:[\\/]", value):
+        _error(errors, f"{field} path is unsafe and must be relative: {value}")
+        return None
+
+    relative = value[2:] if value.startswith("./") else value
+    normalized = relative.replace("\\", "/")
+    segments = normalized.split("/")
+    if ".." in segments:
+        _error(errors, f"{field} path contains unsafe .. traversal: {value}")
+        return None
+    if not relative or any(segment == "" for segment in segments):
+        _error(errors, f"{field} path must identify a file inside the plugin: {value}")
+        return None
+
+    candidate = (root / relative).resolve()
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError:
+        _error(errors, f"{field} path escapes plugin root: {value}")
+        return None
+    return candidate
+
+
+def _component_path(
+    root: Path,
+    manifest: dict,
+    field: str,
+    expected: str,
+    errors: list[str],
+    required: bool = False,
+) -> bool:
     value = manifest.get(field)
     if value is None:
         if required:
@@ -91,9 +153,14 @@ def _component_path(root: Path, manifest: dict, field: str, expected: str, error
     if not isinstance(value, str) or not value:
         _error(errors, f"manifest {field} path must be a non-empty string")
         return False
+    if value != value.strip() or _has_control(value):
+        _error(errors, f"manifest {field} path contains unsupported whitespace or control characters")
     if not value.startswith("./"):
         _error(errors, f"manifest {field} path must start with ./: {value}")
     normalized = value[2:] if value.startswith("./") else value
+    if ".." in normalized.replace("\\", "/").split("/"):
+        _error(errors, f"manifest {field} path contains unsafe .. traversal: {value}")
+        return False
     if normalized.rstrip("/") != expected.rstrip("/"):
         _error(errors, f"manifest {field} path must resolve to ./{expected}: {value}")
         return False
@@ -108,24 +175,16 @@ def _component_path(root: Path, manifest: dict, field: str, expected: str, error
     return True
 
 
-def _relative_file_path(root: Path, field: str, value: object, errors: list[str], required: bool = False) -> Path | None:
-    if value is None:
-        if required:
-            _error(errors, f"{field} is required")
-        return None
-    if not isinstance(value, str) or not value:
-        _error(errors, f"{field} must be a non-empty relative file path")
-        return None
-    if not value.startswith("./"):
-        _error(errors, f"{field} path must start with ./: {value}")
-    relative = value[2:] if value.startswith("./") else value
-    candidate = (root / relative).resolve()
-    try:
-        candidate.relative_to(root.resolve())
-    except ValueError:
-        _error(errors, f"{field} path escapes plugin root: {value}")
-        return None
-    return candidate
+def _validate_codex_plugin_directory(root: Path, errors: list[str]) -> None:
+    directory = root / ".codex-plugin"
+    if not directory.is_dir():
+        return
+    for item in sorted(directory.iterdir(), key=lambda path: path.name):
+        if item.name != "plugin.json":
+            _error(
+                errors,
+                f".codex-plugin may contain plugin.json only; move or remove: .codex-plugin/{item.name}",
+            )
 
 
 def _luminance(hex_color: str) -> float:
@@ -282,7 +341,182 @@ def _skill_metadata(path: Path) -> tuple[str | None, str | None]:
     frontmatter = text[4:end]
     name = re.search(r"(?m)^name:\s*[\"']?([^\n\"']+)", frontmatter)
     description = re.search(r"(?m)^description:\s*(.+)$", frontmatter)
-    return (name.group(1).strip() if name else None, description.group(1).strip() if description else None)
+    return (
+        " ".join(name.group(1).split()) if name else None,
+        " ".join(description.group(1).strip("\"'").split()) if description else None,
+    )
+
+
+def _yaml_unquote(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _yaml_top_level_blocks(text: str, label: str, errors: list[str]) -> dict[str, list[str]]:
+    blocks: dict[str, list[str]] = {}
+    current: str | None = None
+    if "\t" in text:
+        _error(errors, f"{label} must use spaces for indentation")
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if not raw.startswith((" ", "\t")):
+            match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_-]*):\s*(?:#.*)?", raw)
+            if not match:
+                _error(errors, f"{label} must use mapping entries at the top level")
+                current = None
+                continue
+            current = match.group(1)
+            blocks.setdefault(current, [])
+        elif current is not None:
+            blocks[current].append(raw)
+    return blocks
+
+
+def _yaml_block_fields(lines: list[str], label: str, errors: list[str]) -> dict[str, str]:
+    fields: dict[str, str] = {}
+    base_indent: int | None = None
+    for raw in lines:
+        if not raw.strip() or raw.lstrip().startswith("#"):
+            continue
+        indent = len(raw) - len(raw.lstrip(" "))
+        if base_indent is None:
+            base_indent = indent
+        if indent != base_indent:
+            continue
+        match = re.fullmatch(r"\s*([A-Za-z_][A-Za-z0-9_-]*):\s*(.*?)\s*", raw)
+        if not match:
+            _error(errors, f"{label} contains unsupported mapping syntax: {raw.strip()}")
+            continue
+        fields[match.group(1)] = match.group(2)
+    return fields
+
+
+def _validate_skill_agent_metadata(skill_dir: Path, errors: list[str], warnings: list[str]) -> None:
+    path = skill_dir / "agents" / "openai.yaml"
+    if not path.exists():
+        return
+    rel = f"skills/{skill_dir.name}/agents/openai.yaml"
+    if not path.is_file():
+        _error(errors, f"{rel} must be a regular file")
+        return
+    try:
+        text = path.read_text(encoding="utf-8")
+    except Exception as exc:
+        _error(errors, f"{rel} unreadable: {exc}")
+        return
+
+    blocks = _yaml_top_level_blocks(text, rel, errors)
+    interface_lines = blocks.get("interface")
+    if interface_lines is None:
+        _error(errors, f"{rel}: interface mapping is required")
+        return
+    interface = _yaml_block_fields(interface_lines, f"{rel} interface", errors)
+    for field in ("display_name", "short_description"):
+        value = interface.get(field)
+        if value is None or not _yaml_unquote(value).strip():
+            _error(errors, f"{rel}: interface.{field} is required and must be non-empty")
+
+    for field in ("icon_small", "icon_large"):
+        if field in interface:
+            value = _yaml_unquote(interface[field])
+            candidate = _relative_file_path(
+                skill_dir,
+                f"{rel} interface.{field}",
+                value,
+                errors,
+                required=True,
+                require_dot_prefix=False,
+            )
+            if candidate is not None and not candidate.is_file():
+                _error(errors, f"{rel}: interface.{field} asset is missing: {value}")
+
+    brand = interface.get("brand_color")
+    if brand is not None and not HEX_COLOR.fullmatch(_yaml_unquote(brand)):
+        _error(errors, f"{rel}: interface.brand_color must be a six-digit hex color")
+    prompt = interface.get("default_prompt")
+    if prompt is not None and not _yaml_unquote(prompt).strip():
+        _error(errors, f"{rel}: interface.default_prompt must be non-empty when provided")
+
+    if "policy" in blocks:
+        policy = _yaml_block_fields(blocks["policy"], f"{rel} policy", errors)
+        unsupported = sorted(set(policy) - {"products", "allow_implicit_invocation"})
+        for key in unsupported:
+            _error(errors, f"{rel}: unsupported policy field: {key}")
+        implicit = policy.get("allow_implicit_invocation")
+        if implicit is not None and _yaml_unquote(implicit).lower() not in {"true", "false"}:
+            _error(errors, f"{rel}: policy.allow_implicit_invocation must be true or false")
+        products = policy.get("products")
+        if products is not None:
+            raw = _yaml_unquote(products).strip()
+            if raw.startswith("[") and raw.endswith("]"):
+                values = [item.strip().strip("\"'") for item in raw[1:-1].split(",") if item.strip()]
+                if not values or any(item not in {"CHAT", "CODEX"} for item in values):
+                    _error(errors, f"{rel}: policy.products may contain CHAT, CODEX, or both")
+            else:
+                _warning(
+                    warnings,
+                    f"{rel}: policy.products uses YAML syntax outside the dependency-free inline-list checker; official uploader remains authoritative",
+                )
+
+    if "dependencies" in blocks:
+        dependencies = _yaml_block_fields(blocks["dependencies"], f"{rel} dependencies", errors)
+        unsupported = sorted(set(dependencies) - {"tools"})
+        for key in unsupported:
+            _error(errors, f"{rel}: only dependencies.tools is supported; found {key}")
+
+    known = {"interface", "policy", "dependencies"}
+    unknown = sorted(set(blocks) - known)
+    if unknown:
+        _warning(
+            warnings,
+            f"{rel}: unrecognized top-level metadata retained for forward compatibility: {', '.join(unknown)}",
+        )
+
+
+def _validate_app_manifest(path: Path, errors: list[str]) -> None:
+    data = _load_json(path, errors, ".app.json")
+    if not data:
+        return
+    apps = data.get("apps")
+    if not isinstance(apps, dict):
+        _error(errors, ".app.json apps is required and must be an object")
+        return
+    seen_ids: set[str] = set()
+    for alias, entry in apps.items():
+        if not isinstance(entry, dict):
+            _error(errors, f".app.json app entry must be an object: {alias}")
+            continue
+        app_id = entry.get("id")
+        if not isinstance(app_id, str) or not app_id:
+            _error(errors, f".app.json app entry id is required and must be a string: {alias}")
+        elif not APP_ID.fullmatch(app_id):
+            _error(errors, f".app.json app id has unsupported format: {alias}: {app_id}")
+        elif app_id in seen_ids:
+            _error(errors, f".app.json duplicate app id: {app_id}")
+        else:
+            seen_ids.add(app_id)
+        for field in ("optional", "required"):
+            if field in entry and not isinstance(entry[field], bool):
+                _error(errors, f".app.json {alias}.{field} must be true or false")
+
+
+def _validate_mcp_manifest(path: Path, errors: list[str]) -> None:
+    data = _load_json(path, errors, ".mcp.json")
+    if not data:
+        return
+    servers = data.get("mcp_servers") if "mcp_servers" in data else data
+    if not isinstance(servers, dict) or not servers:
+        _error(errors, ".mcp.json must contain a non-empty direct server map or mcp_servers object")
+        return
+    for name, config in servers.items():
+        if not isinstance(name, str) or not name:
+            _error(errors, ".mcp.json server names must be non-empty strings")
+        if not isinstance(config, dict):
+            _error(errors, f".mcp.json server config must be an object: {name}")
 
 
 def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Path], int, int]:
@@ -369,8 +603,15 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
     errors: list[str] = []
     warnings: list[str] = []
     if not root.is_dir():
-        return {"ok": False, "architecture": "unknown", "skills": [], "errors": [f"plugin root is not a directory: {root}"], "warnings": []}
+        return {
+            "ok": False,
+            "architecture": "unknown",
+            "skills": [],
+            "errors": [f"plugin root is not a directory: {root}"],
+            "warnings": [],
+        }
 
+    _validate_codex_plugin_directory(root, errors)
     manifest_path = root / ".codex-plugin" / "plugin.json"
     if not manifest_path.is_file():
         _error(errors, "missing .codex-plugin/plugin.json")
@@ -394,32 +635,67 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
     if isinstance(author, dict):
         _public_https(author.get("url"), "author.url", errors, 2048)
     _public_https(manifest.get("homepage"), "homepage", errors, 2048)
+    _public_https(manifest.get("repository"), "repository", errors, 2048)
 
     mcp_declared = _component_path(root, manifest, "mcpServers", ".mcp.json", errors) if "mcpServers" in manifest else False
     apps_declared = _component_path(root, manifest, "apps", ".app.json", errors) if "apps" in manifest else False
+    if mcp_declared:
+        _validate_mcp_manifest(root / ".mcp.json", errors)
+    elif (root / ".mcp.json").exists():
+        _warning(warnings, "root .mcp.json is ignored because manifest mcpServers is not set to ./.mcp.json")
+    if apps_declared:
+        _validate_app_manifest(root / ".app.json", errors)
+    elif (root / ".app.json").exists():
+        _warning(warnings, "root .app.json is ignored because manifest apps is not set to ./.app.json")
+
     if "hooks" in manifest:
         hook_value = manifest.get("hooks")
-        hook_path = _relative_file_path(root, "manifest hooks", hook_value, errors)
-        if hook_path is not None and not hook_path.is_file():
-            _error(errors, f"manifest hooks file is missing: {hook_value}")
-    has_mcp = mcp_declared or apps_declared or (root / ".mcp.json").exists() or (root / ".app.json").exists()
+        if isinstance(hook_value, str):
+            hook_path = _relative_file_path(root, "manifest hooks", hook_value, errors)
+            if hook_path is not None and not hook_path.is_file():
+                _error(errors, f"manifest hooks file is missing: {hook_value}")
+        elif isinstance(hook_value, list):
+            for index, item in enumerate(hook_value):
+                if isinstance(item, str):
+                    hook_path = _relative_file_path(root, f"manifest hooks[{index}]", item, errors)
+                    if hook_path is not None and not hook_path.is_file():
+                        _error(errors, f"manifest hooks file is missing: {item}")
+                elif not isinstance(item, dict):
+                    _error(errors, f"manifest hooks[{index}] must be a path or inline hooks object")
+        elif not isinstance(hook_value, dict):
+            _error(errors, "manifest hooks must be a path, list, or inline hooks object")
+
+    has_mcp = mcp_declared or apps_declared
     skill_path_value = manifest.get("skills", "./skills/")
     has_skills = False
     skills: list[str] = []
+    skill_names: set[str] = set()
     if isinstance(skill_path_value, str):
-        if not skill_path_value.startswith("./"):
-            _error(errors, f"manifest skills path must start with ./: {skill_path_value}")
-        relative = skill_path_value[2:] if skill_path_value.startswith("./") else skill_path_value
-        if relative.rstrip("/") != "skills":
-            _error(errors, f"manifest skills path must resolve to ./skills/: {skill_path_value}")
-        skill_root = (root / relative).resolve()
-        try:
-            skill_root.relative_to(root)
-        except ValueError:
-            _error(errors, f"manifest skills path escapes plugin root: {skill_path_value}")
+        if not skill_path_value:
+            _error(errors, "manifest skills must be a non-empty relative path string")
             skill_root = root / "__invalid__"
+        else:
+            if not skill_path_value.startswith("./"):
+                _error(errors, f"manifest skills path must start with ./: {skill_path_value}")
+            relative = skill_path_value[2:] if skill_path_value.startswith("./") else skill_path_value
+            if relative.rstrip("/") != "skills":
+                _error(errors, f"manifest skills path must resolve to ./skills/: {skill_path_value}")
+            skill_root = (root / relative).resolve()
+            try:
+                skill_root.relative_to(root)
+            except ValueError:
+                _error(errors, f"manifest skills path escapes plugin root: {skill_path_value}")
+                skill_root = root / "__invalid__"
+
         if skill_root.is_dir():
-            for directory in sorted((item for item in skill_root.iterdir() if item.is_dir()), key=lambda item: item.name):
+            for item in sorted(skill_root.iterdir(), key=lambda child: child.name):
+                if item.is_symlink() or not item.is_dir():
+                    _error(errors, f"skills direct child must be a real directory containing SKILL.md; found: skills/{item.name}")
+                    continue
+                directory = item
+                if directory.name.startswith("."):
+                    _error(errors, f"skill directory must not be hidden: {directory.name}")
+                    continue
                 definition = directory / "SKILL.md"
                 if not definition.is_file():
                     _error(errors, f"skill directory is missing SKILL.md: {directory.name}")
@@ -429,11 +705,16 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
                 except Exception as exc:
                     _error(errors, f"skill definition unreadable: {directory.name}: {exc}")
                     continue
-                if skill_name != directory.name:
-                    _error(errors, f"skill name must match directory: {directory.name}")
+                if not skill_name:
+                    _error(errors, f"skill name is required: {directory.name}")
+                elif skill_name in skill_names:
+                    _error(errors, f"skill name must be unique within plugin: {skill_name}")
+                else:
+                    skill_names.add(skill_name)
+                    skills.append(skill_name)
                 if not skill_description:
                     _error(errors, f"skill description is required: {directory.name}")
-                elif len(skill_description.strip("\"'")) > 1024:
+                elif len(skill_description) > 1024:
                     _error(errors, f"skill description exceeds 1024 characters: {directory.name}")
                 try:
                     skill_text = definition.read_text(encoding="utf-8")
@@ -444,10 +725,8 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
                 except Exception as exc:
                     _error(errors, f"skill body unreadable: {directory.name}: {exc}")
                 if isinstance(name, str) and skill_name and len(f"{name}:{skill_name}") > 64:
-                    _error(errors, f"combined plugin and skill identity exceeds 64 characters: {directory.name}")
-                if directory.name.startswith("."):
-                    _error(errors, f"skill directory must not be hidden: {directory.name}")
-                skills.append(directory.name)
+                    _error(errors, f"combined plugin and skill identity exceeds 64 characters: {skill_name}")
+                _validate_skill_agent_metadata(directory, errors, warnings)
             has_skills = bool(skills)
         elif "skills" in manifest:
             _error(errors, f"manifest skills path is missing: {skill_path_value}")
@@ -468,13 +747,16 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
             _error(errors, f"interface.{field} is required")
         elif len(value) > limit:
             _error(errors, f"interface.{field} exceeds final directory limit of {limit} characters")
-        if field == "shortDescription" and isinstance(value, str) and ("\n" in value or "\r" in value):
-            _error(errors, "interface.shortDescription must fit on one line")
+        if field in {"displayName", "shortDescription", "developerName"} and isinstance(value, str):
+            if "\n" in value or "\r" in value:
+                _error(errors, f"interface.{field} must fit on one line")
+
     category = interface.get("category")
     if not isinstance(category, str) or not category:
         _error(errors, "interface.category is required for final directory submission")
     elif category not in CATEGORIES:
         _error(errors, f"interface.category is unsupported: {category}")
+
     capabilities = interface.get("capabilities")
     if capabilities is not None:
         if not isinstance(capabilities, list) or len(capabilities) > 20:
@@ -511,6 +793,16 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         _https(interface.get(field), field, errors, required=has_mcp)
     _validate_image(root, "logo", interface.get("logo"), errors)
     _validate_image(root, "composerIcon", interface.get("composerIcon"), errors)
+
+    screenshots = interface.get("screenshots")
+    if screenshots is not None:
+        if not isinstance(screenshots, list):
+            _error(errors, "interface.screenshots must be a list of relative asset paths")
+        else:
+            for index, screenshot in enumerate(screenshots):
+                candidate = _relative_file_path(root, f"interface.screenshots[{index}]", screenshot, errors, require_dot_prefix=True)
+                if candidate is not None and not candidate.is_file():
+                    _error(errors, f"interface.screenshots[{index}] asset is missing: {screenshot}")
 
     files, entry_count, total_bytes = _walk(root, errors, exclusions)
     if not exclusions:
