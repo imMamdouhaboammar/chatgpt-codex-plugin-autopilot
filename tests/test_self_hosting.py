@@ -8,6 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
+
 class SelfHostingTests(unittest.TestCase):
     def run_script(self, *args):
         return subprocess.run(["python3", *map(str, args)], cwd=ROOT, text=True, capture_output=True)
@@ -23,16 +24,27 @@ class SelfHostingTests(unittest.TestCase):
     def test_validator_rejects_transient_python_bytecode(self):
         with tempfile.TemporaryDirectory() as temp:
             stage = Path(temp) / "plugin"
-            subprocess.run(["python3", "scripts/self_check.py", "--json"], cwd=ROOT, check=True, capture_output=True, text=True)
+            subprocess.run(
+                ["python3", "scripts/self_check.py", "--json"],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             import sys
             sys.path.insert(0, str(ROOT / "scripts"))
             from self_check import stage_plugin
+
             stage_plugin(stage)
             cache = stage / "skills/chatgpt-codex-plugin-autopilot/scripts/__pycache__"
             cache.mkdir(parents=True)
             (cache / "validate_plugin.cpython-312.pyc").write_bytes(b"transient")
             validator = stage / "skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py"
-            proc = subprocess.run(["python3", str(validator), str(stage), "--json"], text=True, capture_output=True)
+            proc = subprocess.run(
+                ["python3", str(validator), str(stage), "--json"],
+                text=True,
+                capture_output=True,
+            )
             self.assertNotEqual(proc.returncode, 0, proc.stdout)
             self.assertIn("bytecode", proc.stdout.lower())
 
@@ -59,6 +71,9 @@ class SelfHostingTests(unittest.TestCase):
                 self.assertIn("skills/chatgpt-codex-plugin-autopilot/SKILL.md", names)
                 self.assertNotIn("tests/test_self_hosting.py", names)
                 self.assertNotIn("docs/superpowers/plans/2026-08-09-self-hosting-plugin.md", names)
+                self.assertNotIn(".agents/plugins/marketplace.json", names)
+                self.assertNotIn("submission/reviewer-packet.json", names)
+
 
 if __name__ == "__main__":
     unittest.main()
