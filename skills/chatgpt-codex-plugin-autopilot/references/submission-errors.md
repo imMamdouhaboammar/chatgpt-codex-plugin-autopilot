@@ -1,39 +1,178 @@
 # Submission and Review Failure Playbook
 
-Treat uploader/review messages as evidence. Map each error to the producing source, fix it there, regenerate, and rerun the full gate. Do not patch only the final ZIP when a generator will recreate the failure.
+Treat uploader and review messages as evidence. Map each failure to the source that produced it, fix that source, rebuild, and rerun the complete gate. Do not patch only the final ZIP when a generator or installer will recreate the problem.
 
-## Root and archive failures
+This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13.
 
-`plugin_root_ambiguous` or `plugin_root_has_siblings`: package exactly one plugin root. Prefer `.codex-plugin/` directly at archive root. Remove wrapper siblings and accidental parent-directory files.
+## Package root and `.codex-plugin/`
 
-`archive_too_many_entries`, `archive_uncompressed_too_large`, or `archive_member_too_large`: remove unnecessary generated/dev artifacts at source. Do not silently omit runtime files that the plugin actually needs. Re-evaluate whether oversized assets belong behind an MCP/server boundary.
+If the uploader reports an ambiguous plugin root or wrapper siblings, package exactly one plugin root. Prefer `.codex-plugin/` directly at archive root.
 
-Path duplicate, normalization collision, unsupported type, or unreadable member: reject symlinks/special files, normalize paths, remove case/Unicode collisions, and rebuild with ordinary files/directories and supported compression.
+Only `plugin.json` belongs inside `.codex-plugin/`. Move Skills, assets, hooks, `.app.json`, and `.mcp.json` to their documented plugin-root locations.
 
-## Manifest/listing failures
+For entry-count, extracted-size, member-size, duplicate-path, normalization collision, unsupported type, or unreadable-member failures, repair the release surface at source. Reject symlinks and special files and remove generated/dev artifacts that are not runtime dependencies.
 
-For display name, short description, developer name, and URL length errors, optimize for the stricter final-directory limits, not only package-validator limits. Keep short description one line. Use a supported category or omit category to fall back to Other when current docs allow it.
+## Files directly under `skills/`
 
-For MCP-backed listing URL failures, provide all four stable HTTPS destinations: website, privacy, terms, and support. The documents must match real product behavior and data handling.
+A direct file such as:
 
-## Image failures
+```text
+skills/registry.json
+```
 
-If logo/composer icon is missing, non-square, too small, too large, malformed, or has an extension/content mismatch, fix the source asset. SVG needs a valid `<svg>` root and numeric square dimensions. Do not point the required square fields at a horizontal wordmark.
+is not an importable Skill. Every intended Skill must be an immediate real directory containing `SKILL.md`:
+
+```text
+skills/
+  plugin-router/
+    SKILL.md
+    registry.json
+```
+
+OpenAI currently documents direct files and symlinks under `skills/` as ignored package content. Plugin Autopilot intentionally treats them as a strict preflight failure because silent omission is dangerous when the file was intended to drive runtime behavior.
+
+If moving a file changes runtime references, migrate every source consumer, installer, adapter, test, and generated copy. Do not stop after making the uploader message disappear.
+
+## Manifest and final listing failures
+
+For display name, short description, developer name, category, capabilities, starter prompts, and URL failures, validate against final-directory limits rather than only the more permissive package-upload limits.
+
+Current final submission requires a supported category. Keep display name and short description one line and within final-directory limits. For MCP-backed public submission, supply stable HTTPS website, privacy, terms, and support URLs that describe the real product.
+
+## Missing logo or composer icon
+
+Both `interface.logo` and `interface.composerIcon` are required for directory submission. They must reference real square package images.
+
+A valid manifest pattern is:
+
+```json
+"interface": {
+  "composerIcon": "./assets/icon.svg",
+  "logo": "./assets/logo.svg"
+}
+```
+
+The image itself must satisfy the current format, file-size, and dimension checks. Do not point a required square field at a horizontal wordmark.
+
+## Unsafe declared asset paths
+
+Reject paths with:
+
+- outer whitespace
+- control characters
+- absolute filesystem roots
+- Windows drive prefixes
+- `..` traversal segments
+- paths that escape the plugin root
+- missing or non-file targets
+
+A path that resolves back inside the package after normalization can still be rejected if its declared text contains unsafe traversal. Validate the declaration, not only the resolved file.
 
 ## Skill failures
 
-Ensure each Skill has `skills/<skill>/SKILL.md` with valid `name` and `description`. Keep descriptions concise, trigger-oriented, and specific enough for implicit discovery. For a large catalog, reduce discovery noise rather than inflating every description.
+Each Skill must be an immediate child directory of `skills/` and contain a regular readable `SKILL.md`.
 
-## App/MCP reference failures
+Validate front matter for non-empty `name` and `description`, non-empty instructions, unique Skill names, and the current combined plugin/Skill identity limit.
 
-Do not assume a local `.app.json` reference can be published as a public existing ChatGPT app. Skills-only public upload and MCP-backed submission have distinct behavior. Use the current public MCP submission route when the plugin actually depends on MCP.
+Do not require Skill metadata `name` to equal the directory slug unless current official documentation explicitly adds that requirement. They are separate concepts under the current error reference.
+
+For large catalogs, keep metadata concise and trigger-oriented. Do not inflate every description just to improve discovery.
+
+## `agents/openai.yaml` failures
+
+When a Skill includes `agents/openai.yaml`, it must contain the documented Skill interface metadata shape. Common failures include:
+
+- missing `interface`
+- missing/empty `interface.display_name`
+- missing/empty `interface.short_description`
+- invalid icon paths
+- invalid `brand_color`
+- empty `default_prompt`
+- unsupported `policy` keys or values
+- unsupported dependency keys
+
+Skill interface metadata belongs in `agents/openai.yaml`, not a generic `metadata` field in `SKILL.md`.
+
+Plugin Autopilot stays dependency-free, so its local YAML check intentionally targets the documented metadata subset. The official uploader remains authoritative for complete YAML parsing and future schema additions.
+
+## Undeclared `.app.json` and `.mcp.json`
+
+A root `.app.json` is ignored unless the plugin manifest sets:
+
+```json
+"apps": "./.app.json"
+```
+
+A root `.mcp.json` is ignored unless the manifest sets:
+
+```json
+"mcpServers": "./.mcp.json"
+```
+
+Do not classify a plugin as MCP-backed merely because one of these files exists. Decide architecture from declared active components.
+
+When the file is accidental, remove it. When it is required, declare it and validate its content.
+
+## `.app.json` failures
+
+For declared app mappings, validate:
+
+- top level is a JSON object
+- `apps` exists and is an object
+- every alias maps to an object
+- every entry has a string `id`
+- IDs use a currently documented eligible family
+- optional `optional` / `required` fields are booleans
+
+The public submission portal does not publish a reference to an existing ChatGPT app as a substitute for MCP review. Skills-only and MCP-backed public submissions follow separate paths.
+
+## `.mcp.json` failures
+
+A declared bundled MCP file uses either:
+
+- a direct server map, or
+- a top-level `mcp_servers` mapping
+
+Server entries are objects. An empty list or malformed mapping should fail preflight before packaging.
+
+For public MCP submission, package structure is only one part of readiness. Re-check production server, domain verification, tool annotations, demo, test cases, release notes, OAuth review material, and tool scan requirements.
+
+## Hooks
+
+When hooks are declared in the manifest, support the current documented forms instead of assuming a single string path. Hook paths must follow the same safe package-relative rules.
+
+If `hooks/hooks.json` is used through default discovery, do not add a manifest field merely for consistency.
+
+Hooks remain untrusted until the host/user trust flow allows them. Never use hooks for hidden telemetry, credential collection, or permission bypass.
 
 ## Moderation or policy review failure
 
-A review label such as cyber abuse, fraud/scams, or security risk is not an ordinary schema error. Inspect the actual capability and its public instructions before deciding to appeal. An internal role can be valid for private engineering while still being inappropriate for broad public distribution.
+A label such as cyber abuse, fraud/scams, or security risk is not an ordinary schema error. Inspect the actual public capability and instructions before deciding to appeal.
 
-When removal is the chosen remediation, delete the capability from every public surface, not only its generated Skill directory. Trace the source-to-package path and update the canonical generator/allowlist/exclusion layer. Remove generated Skill instructions, native-agent public copies, profile registration, routing maps/indexes, manifest capability/count copy, runtime mirrors, and archive entries. Add a regression test and generation check that fail if the excluded identity returns.
+When removal is the selected remediation, delete the rejected capability from every public surface, not only one generated Skill folder. Trace and update:
 
-Preserve an internal canonical source only when it remains useful, is clearly outside the public plugin, and the product's security policy allows it. Do not rename an unchanged rejected capability merely to evade review.
+- canonical public allowlist/exclusion source
+- generated Skill instructions
+- native-agent public copies
+- profile and routing registrations
+- generated maps/indexes
+- manifest capability/count copy
+- runtime/npm mirrors when present
+- ZIP entries
+- generated documentation counts
 
-After remediation, build a new versioned artifact, run public-exclusion scans against both source and ZIP, and submit the new artifact according to the directory's current update/review flow.
+Add a regression test that fails if the excluded identity returns. Do not rename an unchanged rejected capability merely to evade review.
+
+## After every remediation
+
+1. regenerate from canonical source
+2. rerun repository-native tests
+3. rerun generic plugin preflight
+4. rebuild twice and compare SHA256
+5. inspect archive contents
+6. validate a fresh extraction
+7. verify public exclusions
+8. retest local installation when available
+9. resubmit the exact verified artifact
+
+Report the external state precisely. A fixed ZIP is not automatically submitted, approved, or published.
