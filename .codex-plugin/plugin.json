@@ -1,7 +1,7 @@
 {
   "name": "chatgpt-codex-plugin-autopilot",
-  "version": "0.2.0",
-  "description": "Generic autopilot for building, repairing, validating, packaging, and submission-preflighting ChatGPT/Codex Plugins",
+  "version": "0.3.0",
+  "description": "Generic autopilot for auditing, building, repairing, validating, packaging, and submission-preflighting ChatGPT/Codex plugins",
   "author": {
     "name": "Mamdouh Aboammar",
     "url": "https://github.com/imMamdouhaboammar"
@@ -11,23 +11,22 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Plugin Autopilot",
-    "shortDescription": "Build and ship plugins",
-    "longDescription": "Audits arbitrary repositories, builds or repairs ChatGPT/Codex Plugin configuration, catches package and final-directory validation failures, packages deterministic installable ZIPs, and separates artifact proof from public submission readiness.",
+    "shortDescription": "Audit and package plugins",
+    "longDescription": "Audits arbitrary repositories, builds or repairs ChatGPT/Codex plugin configuration, catches package and directory validation failures, produces deterministic installable ZIPs, and keeps local artifact proof separate from public submission status.",
     "developerName": "Mamdouh Aboammar",
     "category": "Developer Tools",
     "capabilities": ["Plugin architecture audit", "Plugin validation", "Submission preflight", "Deterministic packaging", "Release verification"],
     "websiteURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
     "defaultPrompt": [
-      "Audit this repository and make its ChatGPT/Codex Plugin production-ready.",
-      "Validate and package this repository as an installable ChatGPT/Codex Plugin.",
-      "Diagnose this Plugin submission failure and repair the root cause."
+      "Audit this repository and make its ChatGPT/Codex plugin production-ready.",
+      "Validate and package this repository as an installable ChatGPT/Codex plugin.",
+      "Diagnose this plugin submission failure and repair the root cause."
     ],
     "brandColor": "#1F5EFF",
     "composerIcon": "./assets/mark.svg",
     "logo": "./assets/mark.svg",
     "privacyPolicyURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/PRIVACY.md",
-    "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md",
-    "supportURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/SUPPORT.md"
+    "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md"
   },
   "homepage": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
   "repository": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot"
