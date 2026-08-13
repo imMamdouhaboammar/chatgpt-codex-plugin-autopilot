@@ -1,7 +1,7 @@
 {
   "name": "chatgpt-codex-plugin-autopilot",
-  "version": "0.1.0",
-  "description": "Generic autopilot for building, validating, packaging, and releasing ChatGPT/Codex Plugins",
+  "version": "0.2.0",
+  "description": "Generic autopilot for building, repairing, validating, packaging, and submission-preflighting ChatGPT/Codex Plugins",
   "author": {
     "name": "Mamdouh Aboammar",
     "url": "https://github.com/imMamdouhaboammar"
@@ -12,10 +12,10 @@
   "interface": {
     "displayName": "Plugin Autopilot",
     "shortDescription": "Build and ship plugins",
-    "longDescription": "Audits arbitrary repositories, builds or repairs ChatGPT/Codex Plugin configuration, validates final directory requirements, packages deterministic installable ZIPs, and runs release gates before publication.",
+    "longDescription": "Audits arbitrary repositories, builds or repairs ChatGPT/Codex Plugin configuration, catches package and final-directory validation failures, packages deterministic installable ZIPs, and separates artifact proof from public submission readiness.",
     "developerName": "Mamdouh Aboammar",
     "category": "Developer Tools",
-    "capabilities": ["Plugin architecture audit", "Plugin validation", "Deterministic packaging", "Release verification"],
+    "capabilities": ["Plugin architecture audit", "Plugin validation", "Submission preflight", "Deterministic packaging", "Release verification"],
     "websiteURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
     "defaultPrompt": [
       "Audit this repository and make its ChatGPT/Codex Plugin production-ready.",
