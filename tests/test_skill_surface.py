@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "chatgpt-codex-plugin-autopilot"
 
+
 class SkillSurfaceTests(unittest.TestCase):
     def test_required_skill_files_exist(self):
         required = [
@@ -14,6 +15,7 @@ class SkillSurfaceTests(unittest.TestCase):
             "references/official-contract.md",
             "references/release-playbook.md",
             "references/submission-errors.md",
+            "references/submission-checklist.md",
             "scripts/validate_plugin.py",
             "scripts/package_plugin.py",
         ]
@@ -29,8 +31,25 @@ class SkillSurfaceTests(unittest.TestCase):
 
     def test_skill_contains_self_hosting_release_requirements(self):
         text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
-        for phrase in ("official OpenAI Plugin", "deterministic", "Full Autopilot Publish", "public-distribution safety"):
+        for phrase in (
+            "official OpenAI Plugin",
+            "deterministic",
+            "Full Autopilot Publish",
+            "public-distribution safety",
+        ):
             self.assertIn(phrase, text)
+
+    def test_skill_contains_2026_learned_preflight_contract(self):
+        text = (SKILL / "SKILL.md").read_text(encoding="utf-8")
+        for phrase in (
+            "skills/registry.json",
+            "agents/openai.yaml",
+            "submission-checklist.md",
+            "Package preflight",
+            "undeclared `.app.json` / `.mcp.json`",
+        ):
+            self.assertIn(phrase, text)
+
 
 if __name__ == "__main__":
     unittest.main()
