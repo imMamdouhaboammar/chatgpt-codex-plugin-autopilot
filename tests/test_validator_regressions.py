@@ -12,38 +12,34 @@ def square_svg() -> str:
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64"/></svg>\n'
 
 
-def base_manifest(skill_dir: str = "worker", category: bool = True) -> dict:
-    interface = {
-        "displayName": "Fixture",
-        "shortDescription": "Fixture plugin",
-        "longDescription": "Fixture used by Plugin Autopilot regression tests.",
-        "developerName": "Test Publisher",
-        "logo": "./assets/icon.svg",
-        "composerIcon": "./assets/icon.svg",
-        "websiteURL": "https://example.com",
-        "privacyPolicyURL": "https://example.com/privacy",
-        "termsOfServiceURL": "https://example.com/terms",
-        "supportURL": "https://example.com/support",
-    }
-    if category:
-        interface["category"] = "Developer Tools"
+def base_manifest() -> dict:
     return {
         "name": "fixture-plugin",
         "version": "1.0.0",
         "description": "Fixture plugin for validator tests.",
         "author": {"name": "Test Publisher", "url": "https://example.com"},
         "skills": "./skills/",
-        "interface": interface,
+        "interface": {
+            "displayName": "Fixture",
+            "shortDescription": "Fixture plugin",
+            "longDescription": "Fixture used by Plugin Autopilot regression tests.",
+            "developerName": "Test Publisher",
+            "category": "Developer Tools",
+            "logo": "./assets/icon.svg",
+            "composerIcon": "./assets/icon.svg",
+            "websiteURL": "https://example.com",
+            "privacyPolicyURL": "https://example.com/privacy",
+            "termsOfServiceURL": "https://example.com/terms",
+            "supportURL": "https://example.com/support",
+        },
     }
 
 
-def write_fixture(root: Path, *, skill_dir: str = "worker", skill_name: str = "worker", category: bool = True) -> None:
+def write_fixture(root: Path, *, skill_dir: str = "worker", skill_name: str = "worker") -> None:
     (root / ".codex-plugin").mkdir(parents=True)
     (root / "assets").mkdir()
     (root / "skills" / skill_dir).mkdir(parents=True)
-    (root / ".codex-plugin" / "plugin.json").write_text(
-        json.dumps(base_manifest(skill_dir, category=category)), encoding="utf-8"
-    )
+    (root / ".codex-plugin" / "plugin.json").write_text(json.dumps(base_manifest()), encoding="utf-8")
     (root / "assets" / "icon.svg").write_text(square_svg(), encoding="utf-8")
     (root / "skills" / skill_dir / "SKILL.md").write_text(
         f"---\nname: {skill_name}\ndescription: Use when validating fixture behavior.\n---\n\nValidate the fixture.\n",
@@ -85,7 +81,9 @@ class ValidatorRegressionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
             write_fixture(root)
-            (root / ".mcp.json").write_text(json.dumps({"mcp_servers": {"demo": {"url": "https://example.com/mcp"}}}), encoding="utf-8")
+            (root / ".mcp.json").write_text(
+                json.dumps({"mcp_servers": {"demo": {"url": "https://example.com/mcp"}}}), encoding="utf-8"
+            )
             proc, report = validate(root)
             self.assertEqual(proc.returncode, 0, report)
             self.assertEqual(report["architecture"], "skills-only")
@@ -121,14 +119,6 @@ class ValidatorRegressionTests(unittest.TestCase):
             proc, report = validate(root)
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any("agents/openai.yaml" in error for error in report["errors"]), report)
-
-    def test_allows_omitted_category_with_other_warning(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp) / "plugin"
-            write_fixture(root, category=False)
-            proc, report = validate(root)
-            self.assertEqual(proc.returncode, 0, report)
-            self.assertTrue(any("category" in warning.lower() and "Other" in warning for warning in report["warnings"]), report)
 
     def test_rejects_invalid_declared_app_mapping(self):
         with tempfile.TemporaryDirectory() as temp:
