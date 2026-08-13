@@ -14,9 +14,10 @@ from pathlib import Path
 # Prevent transient bytecode inside the plugin root from entering deterministic archives.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate_plugin import MAX_ARCHIVE, validate_plugin  # noqa: E402
+from validate_plugin import validate_plugin  # noqa: E402
 
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
+MAX_ARCHIVE = 100 * 1000 * 1000
 
 
 def archive_size_within_limit(size: int) -> bool:
