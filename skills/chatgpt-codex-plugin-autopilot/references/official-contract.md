@@ -1,66 +1,156 @@
 # Official OpenAI Plugin Contract Baseline
 
-Checked against official OpenAI documentation on 2026-08-09. Re-check these pages at the start of every public plugin task because submission rules can change:
+Checked against official OpenAI documentation on 2026-08-13. Re-check these pages at the start of every public plugin task because package and submission rules can change:
 
+- https://developers.openai.com/plugins/concepts/plugins
+- https://developers.openai.com/plugins/concepts/skills
 - https://developers.openai.com/plugins/build/plugins
 - https://developers.openai.com/plugins/deploy/submission-errors
-- https://learn.chatgpt.com/docs/build-skills
+- https://developers.openai.com/plugins/deploy/submission
 
 Current official documentation is authoritative over this snapshot.
 
-## Package shape
+## Plugin package shape
 
-Every plugin uses `.codex-plugin/plugin.json` as the native manifest entry point. Plugin-root resources may include `skills/`, `.mcp.json`, `.app.json` compatibility mappings, assets, and lifecycle hooks. Keep component paths relative to the plugin root and `./`-prefixed where referenced by the manifest. When hooks live at `./hooks/hooks.json`, default discovery can avoid a manifest `hooks` field.
+Every plugin uses `.codex-plugin/plugin.json` as the native manifest entry point. Only `plugin.json` belongs inside `.codex-plugin/`.
 
-Public plugins are published once to the universal plugin directory shared by ChatGPT and Codex. Local/repository marketplaces are authoring, testing, private/team distribution surfaces, not evidence that the public directory accepted the package.
+Plugin-root resources may include:
 
-## Public ZIP limits
+```text
+.codex-plugin/plugin.json
+skills/
+hooks/
+.app.json
+.mcp.json
+assets/
+```
 
-- at most 5,000 archive entries
-- at most 512 MiB extracted/uncompressed total
-- at most 100 MiB for any individual archive member
-- regular files and directories only
-- readable, supported, non-encrypted compression
-- unique paths with no duplicate or case/Unicode normalization collision
-- exactly one plugin root, either directly at archive root or inside one top-level directory
-- when a wrapper directory is used, it cannot have sibling files
-- a skills-only upload contains a supported manifest and at least one valid `skills/<skill>/SKILL.md`
+Keep declared component paths relative to the plugin root and `./`-prefixed where the manifest expects paths. `skills` points to the root `skills/` directory, `mcpServers` points to `./.mcp.json`, `apps` points to `./.app.json`, and hook paths follow the same package-relative safety rules.
 
-Prefer archive-root layout with `.codex-plugin/` directly at ZIP root. It reduces root ambiguity and has been proven in production releases.
-
-## Manifest and final-directory limits
-
-Use strict semver for `version`. Keep plugin name at 64 characters or fewer and in the supported ASCII identifier form. Keep description within 1,024 characters and provide `author.name`.
-
-For final public directory submission, apply the stricter listing limits:
-
-- `interface.displayName`: required, non-empty, <= 30 characters
-- `interface.shortDescription`: required, one line, <= 30 characters
-- `interface.longDescription`: required, <= 4,000 characters
-- `interface.developerName`: required, <= 80 characters
-- `interface.capabilities`: at most 20 items, each non-empty, one line, and <= 120 characters
-- `interface.defaultPrompt`: at most 3 prompts, each non-empty, unique after normalization, one line, <= 128 characters, with no app `@mention`
-- public listing URLs: <= 1,024 characters, HTTPS
-- `interface.brandColor` / `brandColorDark`: optional six-digit hex colors; light needs >=2:1 contrast against white and dark needs >=2:1 against `#212121`
-
-The four public listing URLs are website, privacy policy, terms, and support. They are optional for skills-only packages in the shared validator and required for MCP-backed public submissions. For a serious public skills-only plugin, prefer supplying stable accurate URLs unless the product intentionally has none.
-
-Supported public categories currently include Productivity, Creativity, Developer Tools, Business & Operations, Data & Analytics, Communication, Education & Research, Security, Finance, Healthcare, Travel, Entertainment, and Other.
-
-## Branding
-
-`interface.logo` and `interface.composerIcon` are required for directory submission and must reference square images. Supported formats are PNG, JPG/JPEG, WebP, and SVG. Image files must be <= 5 MiB. Raster dimensions must be at least 48x48 and at most 4096x4096. SVG must be valid UTF-8 XML with an `<svg>` root and numeric square dimensions from `viewBox` or numeric width/height; public validation requires at least 48x48.
+Public plugins are published to the universal Plugin Directory shared by ChatGPT and Codex. Repo or personal marketplaces are authoring, testing, and private/team distribution surfaces; a local install is not evidence of public-directory acceptance.
 
 ## Skills
 
-A Skill is an immediate child directory of `skills/` with required `SKILL.md` and optional `scripts/`, `references/`, `assets/`, and `agents/openai.yaml`. `SKILL.md` needs `name` and `description` metadata. The combined `plugin-name:skill-name` identity must be <=64 characters, the description must be <=1,024 characters, and the Skill body must not be empty. ChatGPT and Codex initially discover Skills from name/description and load the full instructions after selection, so front-load trigger language and keep boundaries precise.
+A Skill is an immediate child directory of `skills/` with a required regular `SKILL.md` file. Supporting files may live inside the Skill, including `scripts/`, `references/`, `assets/`, and `agents/openai.yaml`.
 
-Codex bounds the initial Skill list to 2% of context or 8,000 characters when context size is unknown. Large plugin catalogs can have shortened or omitted discovery descriptions. Keep one focused job per Skill rather than relying on large generic descriptions.
+Files or symlinks directly under `skills/` are not imported as Skills. Plugin Autopilot treats those ignored entries as a strict-preflight failure so intended capabilities cannot silently disappear from a release artifact.
 
-`agents/openai.yaml` can configure UI appearance, invocation policy, and tool dependencies. It is optional; do not invent MCP dependencies merely to populate it.
+`SKILL.md` needs YAML front matter with non-empty `name` and `description`, followed by non-empty instructions. The combined `plugin-name:skill-name` identity must fit the current limit, and Skill names must be unique within one plugin. OpenAI normalizes outer/internal whitespace during import. The Skill metadata name does not need to equal the directory name under the current documented contract.
 
-Every public Plugin Directory submission also requires safety/security scans for every bundled Skill plus verified publisher identity and policy attestations. MCP-backed submissions additionally require the current production-server review materials, tool annotations/justifications, test cases, domain verification, release notes, and demo requirements described by the official submission guide.
+ChatGPT and Codex initially discover Skills from metadata and load the full instructions after selection. Keep discovery copy precise and trigger-oriented rather than making every Skill generic.
 
-## App/MCP submission boundary
+## Skill agent metadata
 
-A public skills-only upload does not publish references to an existing ChatGPT app and may remove `.app.json`. An MCP-backed submission must use the MCP submission path and submit the server integration directly. Treat `.app.json` as compatibility/local-workspace configuration unless current official submission docs explicitly support the intended public use.
+A Skill may define `skills/<skill>/agents/openai.yaml`. This is separate from the plugin manifest `interface` and uses snake_case fields.
+
+When the file is present:
+
+- top level is a YAML mapping
+- `interface` is required
+- `interface.display_name` and `interface.short_description` are required and non-empty
+- `interface.icon_small` and `interface.icon_large` are optional relative asset paths
+- `interface.brand_color` is an optional six-digit hex color
+- `interface.default_prompt` is optional and non-empty when provided
+- `policy` is optional and supports `products` plus `allow_implicit_invocation`
+- `products` may contain `CHAT`, `CODEX`, or both
+- `allow_implicit_invocation` is boolean
+- `dependencies` is optional and currently supports `tools`
+
+Do not put Skill interface settings in `metadata` inside `SKILL.md`; the documented interface location is `agents/openai.yaml`.
+
+## Manifest and final-directory metadata
+
+Use strict semver for `version`. Plugin name is limited to the current supported ASCII identifier form and length. Description and author metadata must satisfy package validation.
+
+For final public directory submission, use the stricter listing limits rather than only package-upload limits:
+
+- `interface.displayName`: required, one line, <= 30 characters
+- `interface.shortDescription`: required, one line, <= 30 characters
+- `interface.longDescription`: required, <= 4,000 characters
+- `interface.developerName`: required, one line, <= 80 characters
+- `interface.category`: required, supported category
+- `interface.capabilities`: at most 20 items, each non-empty, one line, <= 120 characters
+- `interface.defaultPrompt`: at most 3 prompts, unique after normalization, one line, <= 128 characters, no app `@mention`
+- final listing URLs: HTTPS and <= 1,024 characters
+- `interface.brandColor` / `brandColorDark`: optional six-digit hex colors with current contrast requirements
+
+Website, support, privacy, and terms URLs are required for MCP-backed public submissions and optional for skills-only submissions under the current final-directory rules. For a serious skills-only product, stable accurate URLs remain a good default when the product actually has them.
+
+## Branding and declared assets
+
+`interface.logo` and `interface.composerIcon` are required for directory submission and must reference square images.
+
+Supported branding formats are PNG, JPG/JPEG, WebP, and SVG. Images must stay within the current file-size and dimension limits. SVG must be valid UTF-8 XML with an `<svg>` root and numeric positive square dimensions.
+
+Declared asset paths must:
+
+- be strings
+- be non-empty
+- contain no outer whitespace or control characters
+- remain relative to the plugin package
+- contain no absolute path, drive prefix, or `..` traversal segment
+- resolve to a real package file
+
+Manifest branding assets should use `./`-prefixed paths. Screenshots are package assets too and should be validated as declared paths.
+
+## App references
+
+`.app.json` is a compatibility mapping for registered MCP server connections. It is imported only when `plugin.json` declares:
+
+```json
+"apps": "./.app.json"
+```
+
+An undeclared root `.app.json` is ignored.
+
+For local/workspace packages, `.app.json` uses a top-level `apps` object. Each alias maps to an object with a required string `id`; optional `optional` and `required` values must be booleans when supplied. The official submission error reference defines the current accepted ID families. The package/build documentation also documents current `plugin_asdk_app...` developer-mode IDs, so re-check both pages when validating a newly generated mapping.
+
+A public skills-only submission does not publish a reference to an existing ChatGPT app. An MCP-backed public submission uses the MCP submission route and submits the MCP server integration directly.
+
+## Bundled MCP configuration
+
+`.mcp.json` is imported only when `plugin.json` declares:
+
+```json
+"mcpServers": "./.mcp.json"
+```
+
+An undeclared root `.mcp.json` is ignored and must not change package architecture classification.
+
+The documented bundled MCP format accepts either a direct server map or a wrapped `mcp_servers` object. Server entries are configuration objects.
+
+## Hooks
+
+Plugins may include lifecycle hooks. If hooks live at `./hooks/hooks.json`, default discovery may avoid a manifest `hooks` field. When the manifest declares hooks, current Codex documentation supports a path, a list of paths, an inline hooks object, or a list containing inline/path entries.
+
+Plugin hooks are not automatically trusted merely because a plugin is installed. Keep hook commands package-relative/portable and avoid hidden telemetry, credential collection, or permission bypasses.
+
+## Public ZIP limits and hygiene
+
+Current public package checks include limits for archive entries, extracted size, and individual members. Keep the deterministic packager stricter than the platform where practical and reject common release contamination:
+
+- symlinks and unsupported special files
+- transient Python bytecode and cache directories
+- `.DS_Store`, `Thumbs.db`, AppleDouble files
+- secret-shaped configuration files
+- normalization/case path collisions
+- accidental absolute local user paths
+- explicitly excluded internal capabilities
+
+Prefer archive-root layout with `.codex-plugin/` directly at ZIP root because it avoids root-wrapper ambiguity.
+
+## Submission readiness beyond the ZIP
+
+A package can pass upload validation and still fail final public submission.
+
+Every public submission needs the current publisher identity, policy attestations, and safety/security review for bundled Skills.
+
+MCP-backed final submission currently adds production-server review material including public URLs, demo evidence, exactly five positive test cases, exactly three negative test cases, release notes, domain verification, current tool scan, explicit MCP tool annotations/justifications, and reviewer credentials when OAuth applies.
+
+Use `references/submission-checklist.md` to keep package proof separate from portal/review proof.
+
+## Local marketplace testing
+
+Repo-scoped and personal marketplaces can be used to test plugins before public submission. Current documentation uses `.agents/plugins/marketplace.json` for repo sources and `~/.agents/plugins/marketplace.json` for personal sources. ChatGPT installs a cached copy rather than running directly from the marketplace source, so test a fresh installed copy after changes.
+
+Local marketplace success does not imply public Plugin Directory approval.
