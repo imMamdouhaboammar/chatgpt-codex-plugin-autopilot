@@ -12,7 +12,8 @@
 
 - Current official OpenAI documentation is authoritative over remembered schema details.
 - `.codex-plugin/` contains `plugin.json` only.
-- Every immediate child under `skills/` must be a Skill directory containing `SKILL.md`.
+- Every immediate child under `skills/` must be a Skill directory containing `SKILL.md` for Autopilot's strict preflight.
+- Final Plugin Directory submission requires a supported category.
 - Do not add MCP/app dependencies to this skill-only plugin.
 - Keep the validator dependency-free.
 - A locally valid ZIP is not evidence of Plugin Directory approval.
@@ -35,6 +36,7 @@
 - [ ] Add a test allowing Skill metadata name to differ from the directory.
 - [ ] Add a test rejecting `..` traversal in asset references.
 - [ ] Add a test rejecting invalid `agents/openai.yaml` metadata.
+- [ ] Add tests rejecting malformed declared app and MCP mappings.
 - [ ] Open a PR and verify the new tests fail for the intended missing behaviors.
 
 ### Task 2: Strengthen the dependency-free validator
@@ -47,13 +49,13 @@
 - Produces: JSON report with `ok`, architecture, skills, errors, warnings, size and file counts.
 
 - [ ] Reject any `.codex-plugin/` child other than `plugin.json`.
-- [ ] Reject files/symlinks directly under the configured `skills/` directory.
+- [ ] Reject files/symlinks directly under the configured `skills/` directory in strict Autopilot preflight so intended Skills cannot be silently ignored.
 - [ ] Track unique Skill metadata names without requiring folder-name equality.
 - [ ] Harden relative asset paths against whitespace, controls, absolute forms, drive prefixes, and `..` segments.
 - [ ] Treat `.app.json`/`.mcp.json` as active only when declared by the manifest and warn when present but undeclared.
 - [ ] Add conservative structural validation for declared app/MCP mappings.
-- [ ] Add structural validation for `agents/openai.yaml` using the supported metadata subset without adding a package dependency.
-- [ ] Change omitted category from blocking error to an explicit `Other` warning while retaining errors for unsupported provided values.
+- [ ] Add structural validation for `agents/openai.yaml` using the documented metadata subset without adding a package dependency.
+- [ ] Keep supported category required because this validator targets final public-directory readiness, not only upload acceptance.
 - [ ] Run the complete unit suite and self-check until green.
 
 ### Task 3: Refresh the official contract and failure playbook
