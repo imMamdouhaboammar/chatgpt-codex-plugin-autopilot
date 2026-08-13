@@ -4,9 +4,9 @@ A standalone, self-hosting Skill Plugin for building, repairing, validating, pac
 
 It is designed for the failures that usually appear late: a ZIP looks correct, the repository tests pass, then the plugin importer ignores a Skill, rejects branding, misreads an undeclared MCP file, or final-directory validation applies stricter rules than the local package check.
 
-## What 0.2 catches before upload
+## What 0.3 catches before upload
 
-Plugin Autopilot now checks the current package contract and several failure classes learned from real plugin repair work:
+Plugin Autopilot checks the current package contract and several failure classes learned from real plugin repair work:
 
 - `.codex-plugin/` contains `plugin.json` only
 - `interface.logo` and `interface.composerIcon` exist and point to square supported images
@@ -20,6 +20,7 @@ Plugin Autopilot now checks the current package contract and several failure cla
 - hooks accept the documented path/list/inline forms while declared paths stay package-relative
 - final Plugin Directory listing limits are applied instead of relying only on looser package limits
 - secret-shaped files, bytecode caches, symlinks, local absolute user paths, normalization collisions, and public exclusions are rejected
+- repo marketplace metadata and reviewer submission material are contract-tested without being added to the runtime ZIP
 
 The validator is dependency-free and intentionally conservative. Official OpenAI validation and review remain authoritative.
 
@@ -37,13 +38,16 @@ python3 skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py . --jso
 
 ### Submission readiness
 
-Checks the public listing, publisher/policy requirements, Skill scan readiness, and MCP review material when applicable.
+Checks the public listing, publisher/policy requirements, Skill scan readiness, reviewer tests, and MCP review material when applicable.
 
 See:
 
 ```text
 skills/chatgpt-codex-plugin-autopilot/references/submission-checklist.md
+submission/reviewer-packet.json
 ```
+
+The reviewer packet is repository-maintained preparation material, not an OpenAI-defined upload schema.
 
 Autopilot reports `locally validated`, `submitted`, `approved`, and `published` as different states.
 
@@ -51,7 +55,7 @@ Autopilot reports `locally validated`, `submitted`, `approved`, and `published` 
 
 Download the ZIP attached to the latest GitHub Release and install or upload it through the supported ChatGPT/Codex Plugin or Skill flow available to your account and workspace.
 
-For repository or personal testing, the current OpenAI plugin flow also supports local marketplace sources. Test the installed cached copy in a fresh chat after changing a plugin.
+For repository or personal testing, the repository includes `.agents/plugins/marketplace.json` for the current local marketplace flow. Test the installed cached copy in a fresh chat after changing a plugin.
 
 ## Self-hosting contract
 
