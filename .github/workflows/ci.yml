@@ -37,5 +37,6 @@ jobs:
           path: |
             dist/chatgpt-codex-plugin-autopilot-*.zip
             dist/SHA256SUMS
+            submission/reviewer-packet.json
           if-no-files-found: error
           retention-days: 7
