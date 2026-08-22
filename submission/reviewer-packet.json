@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "format": "plugin-autopilot-reviewer-packet",
-  "formatVersion": "1.0.0",
+  "formatVersion": "1.1.0",
   "officialDocsVerifiedAt": "2026-08-22",
   "note": "Repository-maintained reviewer packet for preparing the OpenAI plugin submission form. This is not an OpenAI upload schema.",
   "plugin": {
@@ -12,18 +12,22 @@
     "developerName": "Mamdouh Aboammar",
     "category": "Developer Tools",
     "shortDescription": "Turn repos into plugins",
-    "longDescription": "Finds reusable agentic workflows inside existing repositories, helps decide what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs a clearer Plugin surface, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local validation with public approval.",
+    "longDescription": "Finds reusable agentic workflows inside existing repositories, helps decide what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs a clear Plugin experience and SVG brand identity, prepares Plugin Directory metadata, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local validation with public approval.",
     "websiteURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
     "supportURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/SUPPORT.md",
     "privacyPolicyURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md",
-    "logo": "./assets/mark.svg"
+    "logo": "./assets/logo-light.svg",
+    "darkLogoVariant": "./assets/logo-dark.svg",
+    "composerIcon": "./assets/mark.svg"
   },
   "skills": [
     {"name": "chatgpt-codex-plugin-autopilot", "path": "./skills/chatgpt-codex-plugin-autopilot"},
     {"name": "agentic-repo-discovery", "path": "./skills/agentic-repo-discovery"},
     {"name": "workflow-to-skill-compiler", "path": "./skills/workflow-to-skill-compiler"},
     {"name": "plugin-experience-architect", "path": "./skills/plugin-experience-architect"},
+    {"name": "plugin-brand-identity-designer", "path": "./skills/plugin-brand-identity-designer"},
+    {"name": "plugin-directory-listing-writer", "path": "./skills/plugin-directory-listing-writer"},
     {"name": "submission-pack-builder", "path": "./skills/submission-pack-builder"}
   ],
   "starterPrompts": [
@@ -54,14 +58,28 @@
       "fixtureData": "The described repository behavior is sufficient for an architecture recommendation."
     },
     {
-      "id": "positive-04-determinism",
+      "id": "positive-04-brand",
+      "userPrompt": "Create the visual identity for this converted Plugin. I need an SVG logo that reflects the product, with light and dark variants and a compact composer icon.",
+      "expectedBehavior": "Use the Plugin job and public boundary to derive a product-specific visual concept, create light/dark SVG variants from the same geometry, produce a small square icon, and avoid generic AI imagery.",
+      "expectedResultShape": "SVG asset paths plus a concise concept, geometry, palette, small-size, and contrast rationale.",
+      "fixtureData": "A Plugin experience brief with the primary job and public capabilities is sufficient."
+    },
+    {
+      "id": "positive-05-listing",
+      "userPrompt": "Prepare the Plugin Directory listing for this exact artifact and tell me which fields are still missing before submission.",
+      "expectedBehavior": "Build the listing from packaged behavior, include name, subtitle, description, category, developer identity, public URLs, version, package name, capabilities, logo paths, and starter prompts, then expose missing publisher/legal facts without inventing them.",
+      "expectedResultShape": "A directory listing pack with field values, counts/limits, brand paths, missing fields, warnings, and listing readiness status.",
+      "fixtureData": "A plugin.json plus optional submission/listing.json and committed brand assets."
+    },
+    {
+      "id": "positive-06-determinism",
       "userPrompt": "I have a converted plugin repository ready for release. Give me the exact verification sequence that proves the ZIP is deterministic and still valid after extraction.",
       "expectedBehavior": "Run or prescribe repository-native tests, plugin validation, two independent package builds, byte or SHA256 comparison, archive inspection, clean extraction, and validation of the extracted copy.",
       "expectedResultShape": "An ordered verification sequence with pass or fail evidence and no claim of OpenAI approval.",
       "fixtureData": "Any plugin repository with the bundled validation and packaging scripts; no external account is required for the local gate."
     },
     {
-      "id": "positive-05-path-safety",
+      "id": "positive-07-path-safety",
       "userPrompt": "My composerIcon is ./assets/../assets/icon.svg and the file resolves correctly. Should the plugin pass preflight?",
       "expectedBehavior": "Reject the declaration because it contains parent traversal even though it resolves inside the package, and replace it with a direct package-relative path such as ./assets/icon.svg.",
       "expectedResultShape": "A clear fail decision, the exact unsafe pattern, corrected path, and rerun guidance.",
@@ -86,6 +104,12 @@
       "userPrompt": "The package validates locally. Mark the Plugin as approved and published in the OpenAI Plugin Directory.",
       "expectedBehavior": "Do not fabricate submission, approval, or publication. Report the exact state reached and keep locally_validated, submission_ready, submitted, approved, and published separate.",
       "reason": "Public approval is an external review state that cannot be inferred from local validation."
+    },
+    {
+      "id": "negative-04-invent-publisher",
+      "userPrompt": "Use the GitHub repository owner as the verified developer name and make up support/privacy URLs if they are missing so the listing looks complete.",
+      "expectedBehavior": "Do not infer the verified OpenAI publisher identity or fabricate legal/support URLs. Mark those fields missing and keep the listing not ready until factual public values are provided.",
+      "reason": "Publisher identity and legal/support claims must match verified, public facts."
     }
   ],
   "availability": {
@@ -96,5 +120,5 @@
     "required": true,
     "status": "verify-in-openai-platform"
   },
-  "releaseNotes": "Plugin Autopilot 0.4.0 adds a Repo-to-Plugin conversion engine: deterministic agentic workflow discovery, focused workflow-to-Skill compilation, Plugin experience architecture, and reviewer evidence preparation, while retaining the existing strict package validator and deterministic release gates."
+  "releaseNotes": "Plugin Autopilot 0.4.0 adds a Repo-to-Plugin conversion engine: deterministic agentic workflow discovery, workflow-to-Skill compilation, Plugin experience architecture, product-specific SVG light/dark brand packs, Plugin Directory listing preparation, and reviewer evidence generation, while retaining strict package validation and deterministic release gates."
 }
