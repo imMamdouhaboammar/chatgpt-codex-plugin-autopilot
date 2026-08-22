@@ -66,6 +66,77 @@ class RepoAnalyzerTests(unittest.TestCase):
             self.assertIn("mcp", report["signals"])
             self.assertTrue(report["architecture"]["requiresHumanReview"])
 
+    def test_existing_manifest_ignores_undeclared_root_mcp_for_active_architecture(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            skill = repo / "skills/research"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "---\nname: research\ndescription: Use when researching.\n---\n\nResearch.\n",
+                encoding="utf-8",
+            )
+            manifest_dir = repo / ".codex-plugin"
+            manifest_dir.mkdir()
+            (manifest_dir / "plugin.json").write_text(
+                json.dumps({"name": "example", "version": "1.0.0", "skills": "./skills/"}),
+                encoding="utf-8",
+            )
+            (repo / ".mcp.json").write_text(
+                json.dumps({"mcp_servers": {"legacy": {"command": "python3", "args": ["server.py"]}}}),
+                encoding="utf-8",
+            )
+
+            report = self.run_analyzer(repo)
+
+            self.assertEqual(report["architecture"]["recommended"], "skills-only")
+            self.assertNotIn("mcp", report["signals"])
+            self.assertTrue(any("does not declare mcpServers" in item for item in report["warnings"]))
+
+    def test_declared_apps_plus_skills_recommends_hybrid(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            skill = repo / "skills/research"
+            skill.mkdir(parents=True)
+            (skill / "SKILL.md").write_text(
+                "---\nname: research\ndescription: Use when researching.\n---\n\nResearch.\n",
+                encoding="utf-8",
+            )
+            manifest_dir = repo / ".codex-plugin"
+            manifest_dir.mkdir()
+            (manifest_dir / "plugin.json").write_text(
+                json.dumps({
+                    "name": "example",
+                    "version": "1.0.0",
+                    "skills": "./skills/",
+                    "apps": "./.app.json",
+                }),
+                encoding="utf-8",
+            )
+            (repo / ".app.json").write_text(
+                json.dumps({"apps": {"work": {"id": "plugin_asdk_app_example"}}}),
+                encoding="utf-8",
+            )
+
+            report = self.run_analyzer(repo)
+
+            self.assertEqual(report["architecture"]["recommended"], "hybrid")
+            self.assertIn("apps", report["signals"])
+            self.assertTrue(report["architecture"]["requiresHumanReview"])
+
+    def test_ignored_dependency_trees_do_not_enter_inventory_or_candidates(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp)
+            (repo / "AGENTS.md").write_text("Review releases.\n", encoding="utf-8")
+            ignored = repo / "node_modules" / "package" / "workflows"
+            ignored.mkdir(parents=True)
+            for index in range(30):
+                (ignored / f"workflow-{index}.md").write_text("Ignore me.\n", encoding="utf-8")
+
+            report = self.run_analyzer(repo)
+
+            self.assertEqual(report["summary"]["fileCount"], 1)
+            self.assertEqual({item["path"] for item in report["candidates"]}, {"AGENTS.md"})
+
     def test_output_is_deterministic_for_same_repository(self):
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
