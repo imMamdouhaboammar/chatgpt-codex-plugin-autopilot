@@ -19,6 +19,8 @@ Design the Plugin around user jobs rather than the source repository's internal 
 8. Review implicit invocation policy per Skill. Narrow, low-risk workflows may be suitable for implicit discovery; sensitive or destructive workflows need tighter invocation boundaries.
 9. Check the portfolio for discovery collisions, jargon, unexplained acronyms, and source-project naming that means nothing to a new user.
 10. Keep the public surface intentionally smaller than the repository when that produces a clearer product.
+11. Define the one product idea the brand mark should express. Describe the relationship/action visually without prescribing generic AI symbols.
+12. Create a discovery test brief with direct, indirect, and negative prompt families before final listing copy is frozen.
 
 ## Decision test
 
@@ -38,13 +40,24 @@ If these answers are weak, return the candidate to discovery/compilation instead
 
 Produce a Plugin experience brief containing:
 
-- primary audience and job
+- primary audience and recurring job
 - public Skill set and exclusions
 - required/optional app dependencies
-- Plugin promise
+- Plugin promise grounded in packaged behavior
 - capability list
 - up to three starter prompt directions
+- direct, indirect, and negative discovery-prompt directions
 - invocation-policy notes
+- one visual idea for the brand mark
 - listing risks or unsupported claims
 
-Then hand the exact artifact to the main Autopilot validation gate and `submission-pack-builder`.
+## Handoff order
+
+Do not jump straight from product design to submission.
+
+1. Hand the stable Plugin concept to `plugin-brand-identity-designer` for the light/dark SVG identity pack and compact composer/icon asset.
+2. Hand the exact capabilities, starter prompts, brand paths, and discovery test brief to `plugin-directory-listing-writer`.
+3. Run the main Autopilot package validator and `build_directory_pack.py` against the exact artifact.
+4. Only after those gates pass, hand the artifact and evidence to `submission-pack-builder`.
+
+If branding or listing work exposes a confused product boundary, return to this Skill instead of polishing around the problem.
