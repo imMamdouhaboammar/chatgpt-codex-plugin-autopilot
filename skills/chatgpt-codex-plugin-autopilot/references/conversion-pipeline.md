@@ -68,7 +68,7 @@ Use `plugin-experience-architect` after candidate compilation.
 
 Design from the user's job, not the source repository taxonomy. Decide:
 
-- plugin name and listing promise
+- plugin name and public promise
 - which Skills deserve public discovery
 - capability language
 - starter prompts that represent valuable real tasks
@@ -78,18 +78,69 @@ Design from the user's job, not the source repository taxonomy. Decide:
 
 A Plugin with twenty technically valid Skills can be worse than one with four sharply differentiated workflows.
 
-## 6. Validate the artifact
+## 6. Design the SVG brand pack
+
+Use `plugin-brand-identity-designer` only after the public product boundary is stable.
+
+Every Autopilot-prepared public Plugin should include:
+
+```text
+assets/logo-light.svg
+assets/logo-dark.svg
+assets/<composer-icon>.svg
+```
+
+The light and dark logos share one core geometry. The symbol must derive from the Plugin's real job and remain legible at small size. Reject generic robot, brain, sparkle-only, arbitrary-circuit, or stock SaaS marks.
+
+Do not invent unsupported manifest fields to point at the dark variant. Keep both SVG variants in the packaged identity kit while declaring only fields supported by the current OpenAI contract.
+
+Record a one-paragraph rationale explaining what the mark represents, why the geometry fits the product, and how the light/dark variants differ.
+
+## 7. Build the Plugin Directory listing
+
+Use `plugin-directory-listing-writer`, then run:
+
+```bash
+python3 <autopilot-skill>/scripts/build_directory_pack.py <target-plugin> --json
+```
+
+The pack should contain or expose missing values for:
+
+- Name
+- Subtitle / short description
+- Description / long description
+- Category
+- verified Developer name
+- Website URL
+- Customer support URL
+- Privacy policy URL
+- Terms of Service URL
+- Version
+- Package name
+- Capabilities
+- logo and composer/icon paths
+- starter prompts
+
+Never infer a verified legal/business identity from package metadata or GitHub ownership. Never invent public URLs.
+
+Treat metadata as a discovery surface. Build a golden prompt set containing direct, indirect, and negative prompts and record the expected behavior. Revise metadata when precision/recall is poor.
+
+## 8. Validate the artifact
 
 Run repository-native tests and the strict Autopilot preflight. Then package twice and compare bytes. A converter must not weaken the validator to make generated output pass.
 
-## 7. Build the submission evidence
+For Autopilot-prepared public Plugins, treat missing committed light/dark SVG variants as a conversion-quality failure even if the platform currently requires only one declared logo path.
 
-Use `submission-pack-builder` only after the exact artifact passes package preflight.
+## 9. Build the submission evidence
+
+Use `submission-pack-builder` only after the exact artifact passes package preflight and the brand/listing packs are reviewed.
 
 Keep separate statuses for:
 
 - analyzed
 - conversion planned
+- brand ready
+- listing ready
 - locally validated
 - submission ready
 - submitted
@@ -97,6 +148,8 @@ Keep separate statuses for:
 - published
 
 The submission pack should explain what the Plugin does for users, what runtime capabilities it needs, what was excluded from the source repository, how reviewers can test it, and what evidence supports each public claim.
+
+At the 2026-08-22 baseline, the official OpenAI submission flow asks for at least five positive reviewer tests and three negative tests. Re-check the requirement before every submission.
 
 ## Conversion report contract
 
@@ -108,6 +161,9 @@ For serious conversions, leave a repository-maintained report such as `plugin-co
 - architecture decision and rationale
 - public exclusions
 - generated/modified files
+- brand concept and asset paths
+- directory listing fields and missing publisher/legal facts
+- golden prompt set and discovery observations
 - tests and validation evidence
 - unresolved risks
 - submission status
