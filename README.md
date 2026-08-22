@@ -2,13 +2,13 @@
 
 A lot of strong agentic work already exists in GitHub repositories.
 
-The problem is that the useful part is often buried in `AGENTS.md`, prompts, playbooks, commands, scripts, custom agents, or repo-specific workflows. The repository may be excellent for its original author and still be difficult to install, discover, or reuse as a ChatGPT/Codex Plugin.
+The useful part is often buried in `AGENTS.md`, prompts, playbooks, commands, scripts, custom agents, or repo-specific workflows. The repository may be excellent for its original author and still be difficult for someone else to discover, install, or reuse as a ChatGPT/Codex Plugin.
 
 Plugin Autopilot is for that gap.
 
-Give it an existing agentic repository. It helps find the workflows worth sharing, decide what should become Skills, keep internal-only material out of the public package, choose whether an external app/MCP runtime is actually necessary, then validate and package the result against the current ChatGPT/Codex Plugin contract.
+Give it an existing agentic repository. It helps find the workflows worth sharing, decide what should become Skills, keep internal-only material out of the public package, choose whether an external app/MCP runtime is genuinely required, shape the public Plugin, build its SVG identity and Plugin Directory metadata, then validate and package the exact result.
 
-It also still does the strict preflight work from earlier releases: package validation, deterministic ZIPs, submission readiness checks, and clear status boundaries between local proof and OpenAI review.
+It also keeps the strict release work from earlier versions: package validation, deterministic ZIPs, clean-extraction checks, submission evidence, and explicit boundaries between local proof and OpenAI review.
 
 ## The 0.4 flow
 
@@ -32,15 +32,23 @@ DESIGN
 Shape a clear Plugin around user jobs, not the repo's folder structure
     |
     v
+BRAND
+Create a product-specific SVG identity with light + dark variants
+    |
+    v
+LIST
+Prepare Plugin Directory fields, capabilities, prompts and publisher gaps
+    |
+    v
 PROVE
-Tests -> strict preflight -> deterministic package -> clean extraction check
+Tests -> directory gate -> strict preflight -> deterministic package -> clean extraction
     |
     v
 PREPARE
 Reviewer evidence and submission material for the exact validated artifact
 ```
 
-The important part is the second step. Autopilot does not assume every clever agent or internal workflow belongs in a public Plugin.
+The important principle is that Autopilot does not assume every clever agent or internal workflow belongs in a public Plugin. Conversion is a product and distribution decision, not a folder-copy operation.
 
 ## Start with repository discovery
 
@@ -58,7 +66,7 @@ The analyzer is dependency-free and read-only. It inventories likely agentic wor
 - next conversion actions
 - warnings such as undeclared `.mcp.json` or `.app.json`
 
-It is deliberately a discovery tool, not an automatic publisher. A human or agent still reviews the candidates in context and sets the public product boundary.
+It is deliberately a discovery tool, not an automatic publisher. A maintainer still reviews candidates in context and sets the public product boundary.
 
 ## Focused Skills included
 
@@ -68,15 +76,23 @@ Use it when the starting point is an existing repository rather than a finished 
 
 ### `workflow-to-skill-compiler`
 
-Use it to convert a selected playbook, prompt chain, runbook, command, or agent workflow into a portable Skill without throwing away its decision logic, approval gates, evidence requirements, or stop conditions.
+Use it to convert a selected playbook, prompt chain, runbook, command, or agent workflow into a portable Skill without throwing away its real decision logic, approval gates, evidence requirements, or stop conditions.
 
 ### `plugin-experience-architect`
 
-Use it after the candidate Skills exist. It reduces overlap, defines the public Skill set, decides required versus optional app dependencies, and makes listing capabilities and starter prompts correspond to real user jobs.
+Use it after the candidate Skills exist. It reduces overlap, defines the public Skill set, decides required versus optional app dependencies, creates starter/discovery prompt directions, and defines the visual idea the Plugin identity should express.
+
+### `plugin-brand-identity-designer`
+
+Use it after the public product boundary is stable. It requires a self-contained SVG identity kit with `logo-light.svg`, `logo-dark.svg`, and a compact square icon. Both variants share one geometry and must represent the Plugin's actual job rather than generic AI imagery.
+
+### `plugin-directory-listing-writer`
+
+Use it to turn the exact Plugin into truthful public metadata: Name, Subtitle, Description, Category, verified Developer name, Website, Customer support, Privacy policy, Terms, Version, Package name, Capabilities, starter prompts, and current reviewer material. Missing publisher or legal facts remain missing instead of being guessed.
 
 ### `submission-pack-builder`
 
-Use it only after the exact artifact passes local preflight. It prepares reviewer evidence while keeping `locally_validated`, `submission_ready`, `submitted`, `approved`, and `published` as different states.
+Use it only after package, brand, and listing gates pass for the exact artifact. It prepares reviewer evidence while keeping `listing_ready`, `locally_validated`, `submission_ready`, `submitted`, `approved`, and `published` as different states.
 
 ### `chatgpt-codex-plugin-autopilot`
 
@@ -94,9 +110,59 @@ The presence of API code, `.mcp.json`, or an MCP server in the source repository
 
 Plugin Autopilot itself remains Skills-only.
 
+## Brand pack
+
+Autopilot now treats visual identity as part of Plugin preparation rather than an afterthought.
+
+For public Plugin work, the expected identity kit is:
+
+```text
+assets/
+  logo-light.svg
+  logo-dark.svg
+  <composer-icon>.svg
+```
+
+The light and dark variants must share one core geometry, remain readable at small sizes, and be self-contained SVGs with no external font or image dependency.
+
+The Autopilot 0.4 mark represents multiple repository/workflow inputs converging into one packaged Plugin. Its rationale and usage rules live in `docs/brand-system.md`.
+
+Do not invent undocumented manifest fields just to declare the dark variant. Package both variants and declare only fields supported by the current OpenAI Plugin contract.
+
+## Plugin Directory pack
+
+The repository keeps listing evidence separately from the runtime ZIP in `submission/listing.json`.
+
+Build and validate it with:
+
+```bash
+python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json
+```
+
+The pack covers:
+
+- Name
+- Subtitle / short description
+- Description / long description
+- Category
+- Developer name
+- Website URL
+- Customer support URL
+- Privacy policy URL
+- Terms of Service URL
+- Version
+- Package name
+- Capabilities
+- starter prompts
+- light/dark/icon asset paths
+
+`developerName` is not automatically trusted just because it appears in `plugin.json`. It still has to match the verified developer or business identity used in the OpenAI submission flow.
+
+Metadata is also treated as a discovery surface. The workflow calls for direct, indirect, and negative golden prompts so vague names/descriptions can be fixed before submission rather than keyword-stuffed after a routing problem appears.
+
 ## What strict preflight catches
 
-The validator still checks the failure classes that usually show up late:
+The validator checks failure classes that often show up late:
 
 - `.codex-plugin/` contains `plugin.json` only
 - `interface.logo` and `interface.composerIcon` exist and point to square supported images
@@ -113,9 +179,17 @@ The validator still checks the failure classes that usually show up late:
 
 The validator is dependency-free and intentionally conservative. Official OpenAI validation and review remain authoritative.
 
-## Two separate gates
+## Separate gates
 
-A plugin can be structurally valid without being ready for public review.
+A Plugin can be structurally valid while its public identity, listing, or submission evidence is incomplete.
+
+### Directory listing gate
+
+```bash
+python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json
+```
+
+This checks the repository-maintained listing pack, SVG light/dark assets, field limits, HTTPS public URLs, capabilities, starter prompts, and missing facts.
 
 ### Package preflight
 
@@ -123,7 +197,7 @@ A plugin can be structurally valid without being ready for public review.
 python3 skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py . --json
 ```
 
-This answers whether the artifact is structurally safe, internally consistent, and packageable.
+This answers whether the runtime artifact is structurally safe, internally consistent, and packageable.
 
 ### Submission readiness
 
@@ -131,12 +205,14 @@ Use:
 
 ```text
 skills/chatgpt-codex-plugin-autopilot/references/submission-checklist.md
+skills/chatgpt-codex-plugin-autopilot/references/branding-and-listing.md
+submission/listing.json
 submission/reviewer-packet.json
 ```
 
-This checks the public listing, publisher/policy requirements, Skill scan readiness, reviewer evidence, and MCP review material when applicable.
+This checks the public listing, publisher/policy requirements, brand evidence, Skill scan readiness, reviewer cases, and MCP review material when applicable.
 
-The reviewer packet is repository-maintained preparation material, not an OpenAI-defined upload schema.
+These repository JSON files are preparation/evidence formats, not OpenAI upload schemas.
 
 ## Deterministic packaging
 
@@ -151,21 +227,23 @@ Extract the archive into a clean directory and run the validator again against t
 
 ## Self-hosting contract
 
-This repository uses the same validator and deterministic packager shipped inside the Plugin to validate and package itself.
+This repository uses the same analyzer, listing gate, validator, and deterministic packager that it ships to validate its own Plugin surface.
 
 A release is blocked unless:
 
 1. unit tests pass
-2. the staged plugin self-validates
-3. deterministic archive builds match
-4. archive contents are inspected
-5. a fresh extraction validates again
-6. the public release surface passes its checks
+2. the directory listing pack passes
+3. the staged Plugin self-validates
+4. deterministic archive builds match
+5. archive contents are inspected
+6. a fresh extraction validates again
+7. the public release evidence surface passes its checks
 
 Local verification:
 
 ```bash
 python3 -m unittest discover -s tests -v
+python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json
 python3 scripts/self_check.py
 python3 scripts/build_release.py --out-dir dist
 ```
@@ -174,12 +252,12 @@ The release scripts do not publish to the OpenAI Plugin Directory and do not cla
 
 ## Current distribution context
 
-OpenAI moved discovery to the Plugin Directory on July 9, 2026. Plugins are now the main discovery unit across ChatGPT and Codex and can package Skills, apps, and app templates. Skills follow the Agent Skills open standard.
+The public Plugin Directory is shared across ChatGPT and Codex. Current OpenAI submission guidance requires public listing information, a verified developer/business identity, reviewer test material, and other evidence depending on whether the Plugin is Skills-only or MCP-backed.
 
-Because this can change, the Autopilot operating contract requires checking the current official OpenAI documentation before modifying a public Plugin or preparing a submission.
+Because the contract can change, Autopilot requires checking current official OpenAI documentation before modifying a public Plugin or preparing a submission.
 
 ## Goal
 
 The goal is not to turn every repository into a Plugin.
 
-It is to make the genuinely useful agentic workflows already sitting in repositories easier for other people to discover, install, understand, and reuse, while preserving the quality and safety boundaries that made those workflows useful in the first place.
+It is to make genuinely useful agentic workflows already sitting in repositories easier for other people to discover, install, understand, and reuse, while preserving the product, safety, privacy, and evidence boundaries that made those workflows useful in the first place.
