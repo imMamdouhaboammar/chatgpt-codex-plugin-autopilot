@@ -19,7 +19,7 @@ class SelfHostingTests(unittest.TestCase):
         report = json.loads(proc.stdout)
         self.assertTrue(report["ok"])
         self.assertEqual(report["architecture"], "skills-only")
-        self.assertEqual(report["skills"], 7)
+        self.assertEqual(report["skills"], 9)
 
     def test_validator_rejects_transient_python_bytecode(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -63,7 +63,7 @@ class SelfHostingTests(unittest.TestCase):
             self.assertEqual(first_bytes, second_bytes)
             self.assertEqual(hashlib.sha256(first_bytes).hexdigest(), first_report["sha256"])
             self.assertEqual(first_report["sha256"], second_report["sha256"])
-            self.assertEqual(first_report["skills"], 7)
+            self.assertEqual(first_report["skills"], 9)
             sums = (out / "SHA256SUMS").read_text(encoding="utf-8")
             self.assertIn(first_report["sha256"], sums)
             with zipfile.ZipFile(archive) as zf:
@@ -72,9 +72,16 @@ class SelfHostingTests(unittest.TestCase):
                 self.assertIn("skills/chatgpt-codex-plugin-autopilot/SKILL.md", names)
                 self.assertIn("skills/chatgpt-codex-plugin-autopilot/scripts/analyze_repo.py", names)
                 self.assertIn("skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py", names)
+                self.assertIn("skills/chatgpt-codex-plugin-autopilot/scripts/install_host_workspace_skill.py", names)
+                self.assertIn("skills/chatgpt-codex-plugin-autopilot/references/host-python-sandbox.md", names)
+                self.assertIn("skills/chatgpt-codex-plugin-autopilot/references/host-workspace-capabilities.md", names)
                 self.assertIn("skills/agentic-repo-discovery/SKILL.md", names)
                 self.assertIn("skills/workflow-to-skill-compiler/SKILL.md", names)
                 self.assertIn("skills/plugin-experience-architect/SKILL.md", names)
+                self.assertIn("skills/host-workspace-operator/SKILL.md", names)
+                self.assertIn("skills/host-workspace-operator/agents/openai.yaml", names)
+                self.assertIn("skills/sandbox-python-executor/SKILL.md", names)
+                self.assertIn("skills/sandbox-python-executor/agents/openai.yaml", names)
                 self.assertIn("skills/plugin-brand-identity-designer/SKILL.md", names)
                 self.assertIn("skills/plugin-directory-listing-writer/SKILL.md", names)
                 self.assertIn("skills/submission-pack-builder/SKILL.md", names)
