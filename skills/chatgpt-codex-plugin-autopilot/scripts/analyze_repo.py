@@ -18,6 +18,7 @@ TEXT_SUFFIXES = {".md", ".mdx", ".txt", ".yaml", ".yml", ".json", ".toml"}
 AGENT_FILES = {"AGENTS.md", "CLAUDE.md", "GEMINI.md", "COPILOT.md"}
 WORKFLOW_DIRS = {"workflow", "workflows", "playbook", "playbooks", "commands", "prompts", "recipes"}
 AGENT_DIRS = {"agent", "agents", ".agents", ".claude"}
+WORKSPACE_CAPABILITIES = ["read", "list", "search", "grep", "write", "patch", "shell", "python"]
 
 
 def rel(path: Path, root: Path) -> str:
@@ -140,9 +141,6 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
     root_mcp_present = ".mcp.json" in relative_files
     root_app_present = ".app.json" in relative_files
 
-    # Once a Plugin manifest exists, app/MCP architecture is defined by declared active
-    # components. Stray root files remain review evidence only. For an unshaped repo,
-    # explicit root config is still a meaningful conversion signal.
     if manifest["present"]:
         has_mcp = manifest["declaresMcp"]
         has_apps = manifest["declaresApps"]
@@ -179,6 +177,18 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
         recommended = "skills-only"
         reason = "The reusable workflows can be distributed without requiring an external runtime."
 
+    # Repository conversion is inherently workspace-oriented. Install the shared
+    # operator when a Plugin is being created from repository files, then let the
+    # experience architect narrow which operations each domain Skill actually uses.
+    workspace_profile = {
+        "installRecommended": bool(files),
+        "skill": "host-workspace-operator",
+        "capabilities": WORKSPACE_CAPABILITIES,
+        "readOnly": ["read", "list", "search", "grep"],
+        "mutations": ["write", "patch", "mutating shell commands"],
+        "hostControlled": True,
+    }
+
     next_actions = ["review_candidates"]
     if has_skill_candidates:
         next_actions.append("compile_workflows")
@@ -186,6 +196,8 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
         next_actions.append("review_external_actions")
     next_actions.extend([
         "design_plugin_experience",
+        "plan_host_workspace_capabilities",
+        "install_host_workspace_skill",
         "validate_public_safety",
         "design_brand_identity",
         "build_directory_listing",
@@ -215,6 +227,7 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
             "reason": reason,
             "requiresHumanReview": bool(has_external_runtime),
         },
+        "hostWorkspace": workspace_profile,
         "manifest": manifest,
         "inventory": {
             "topLevel": sorted({path.relative_to(root).parts[0] for path in files}),
@@ -250,6 +263,7 @@ def main() -> int:
     else:
         print(f"architecture: {report['architecture']['recommended']}")
         print(f"candidates: {report['summary']['candidateCount']}")
+        print(f"workspace skill: {report['hostWorkspace']['skill']} install={report['hostWorkspace']['installRecommended']}")
         for candidate in report["candidates"][:20]:
             print(f"- {candidate['kind']}: {candidate['path']} -> {candidate['recommendedTarget']}")
         for warning in report["warnings"]:
