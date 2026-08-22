@@ -1,6 +1,6 @@
 # Official OpenAI Plugin Contract Baseline
 
-Checked against official OpenAI documentation on 2026-08-13. Re-check these pages at the start of every public plugin task because package and submission rules can change:
+Checked against official OpenAI documentation on 2026-08-22. Re-check these pages at the start of every public plugin task because package and submission rules can change:
 
 - https://developers.openai.com/plugins/concepts/plugins
 - https://developers.openai.com/plugins/concepts/skills
@@ -9,6 +9,12 @@ Checked against official OpenAI documentation on 2026-08-13. Re-check these page
 - https://developers.openai.com/plugins/deploy/submission
 
 Current official documentation is authoritative over this snapshot.
+
+## 2026 distribution context
+
+As of July 9, 2026, OpenAI's Plugin Directory is the primary discovery surface for workflow capabilities across ChatGPT and Codex. Plugins may package Skills, apps, and app templates. Skills follow the Agent Skills open standard and remain portable workflow units; apps remain the integration boundary for external data and actions.
+
+That distinction matters during repository conversion: do not add an app or MCP dependency merely because the source repository contains API code. First decide whether the user-facing workflow actually needs external data/actions or can remain portable as a Skill.
 
 ## Plugin package shape
 
