@@ -11,6 +11,10 @@ class WorkflowTests(unittest.TestCase):
         text = CI.read_text(encoding="utf-8")
         self.assertIn("python3 -m unittest discover -s tests -v", text)
         self.assertIn("python3 scripts/self_check.py", text)
+        self.assertIn(
+            "python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json",
+            text,
+        )
         self.assertIn("python3 scripts/build_release.py --out-dir dist", text)
         self.assertRegex(text, r"actions/checkout@[0-9a-f]{40}")
         self.assertRegex(text, r"actions/upload-artifact@[0-9a-f]{40}")
