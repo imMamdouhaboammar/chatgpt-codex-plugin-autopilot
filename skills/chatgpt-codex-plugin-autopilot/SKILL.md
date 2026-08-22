@@ -1,32 +1,65 @@
 ---
 name: chatgpt-codex-plugin-autopilot
-description: Use when building, repairing, validating, packaging, submitting, publishing, or auditing a ChatGPT/Codex Plugin in any repository. Handles skills-only, MCP-backed, hybrid plugins, strict package preflight, Plugin Directory readiness, moderation-safe public packaging, deterministic ZIPs, and Full Autopilot Publish.
+description: Use when converting an agentic repository into a ChatGPT/Codex Plugin or when building, repairing, validating, packaging, submitting, publishing, or auditing an existing Plugin.
 ---
 
 # ChatGPT/Codex Plugin Autopilot
 
-Take an arbitrary repository from discovery to a verified ChatGPT/Codex Plugin artifact and, when explicitly authorized, through release/submission. Treat the target repository as authoritative for product behavior and release channels. Never require Riqor, Bun, Node, or a project-specific layout unless the target already requires it.
+Take an arbitrary repository from agentic-workflow discovery to a verified ChatGPT/Codex Plugin artifact and, when explicitly authorized, through release/submission. Treat the target repository as authoritative for product behavior and release channels. Never require Riqor, Bun, Node, or a project-specific layout unless the target already requires it.
 
 ## Operating contract
 
 1. Verify the current official OpenAI Plugin and Skill documentation before editing public plugin configuration. Current official docs override remembered schema, examples, and numeric limits. Read `references/official-contract.md` and record the verification date.
 2. Inspect repository instructions, dirty state, package metadata, manifests, Skills, MCP/app configuration, hooks, assets, legal/support pages, CI, tags, release scripts, and registry policy before changing anything.
-3. Classify the target using `references/architectures.md` as `skills-only`, `MCP-backed`, or `hybrid`. Classify from declared active components and actual product behavior, not from stray `.app.json` or `.mcp.json` files.
-4. Run a public-distribution safety review before generating or packaging public Skills. Internal capability does not imply Plugin Directory suitability.
-5. Build or repair `.codex-plugin/plugin.json`, focused Skills, optional `agents/openai.yaml`, optional MCP/app configuration, optional hooks, square branding, and accurate public URLs.
-6. Enforce package shape before copywriting polish: only `plugin.json` inside `.codex-plugin/`; every intended Skill as an immediate real child directory of `skills/` with `SKILL.md`; no direct files or symlinks under `skills/` that are expected to import as Skills.
-7. Validate declared asset text as well as resolved files. Reject outer whitespace, control characters, absolute/drive paths, `..` traversal, package escapes, missing files, and invalid required branding dimensions.
-8. Validate `agents/openai.yaml` when present. Require its documented `interface` metadata and validate supported policy/dependency fields without pretending the local dependency-free checker replaces the official YAML/uploader implementation.
-9. Treat `.app.json` and `.mcp.json` as active only when the manifest declares `apps` or `mcpServers` respectively. Warn on undeclared root files because OpenAI ignores them. Validate declared mappings structurally before packaging.
-10. Apply final Plugin Directory limits, not only looser package-validation limits. Keep category, listing copy, starter prompts, URLs, branding, and capabilities within the current final rules.
-11. Run repository-native tests plus `scripts/validate_plugin.py` and fail closed on every blocking local preflight error.
-12. Build the ZIP twice with `scripts/package_plugin.py` and require byte-identical SHA256 results. Extract a fresh copy and validate the extraction again.
-13. Inspect archive root, files, counts, excluded capabilities, secrets/privacy boundary, package-relative paths, and installation behavior.
-14. Smoke a fresh install on every available ChatGPT/Codex surface. Prefer a repo/personal local marketplace when available and test the installed cached copy in a new chat. Do not claim unavailable surfaces were tested.
-15. Run the separate submission-readiness gate in `references/submission-checklist.md`. A valid ZIP is not automatically ready for public review.
-16. Diagnose uploader or review failures using `references/submission-errors.md`; repair root causes and every generated/runtime reference, then rerun the complete gate.
-17. Under Full Autopilot Publish, commit, tag, push, publish, and create releases without another routine confirmation only after all gates pass and only within the user's authorized release scope. Follow `references/release-playbook.md`.
-18. Download published artifacts and compare hashes or bytes whenever the channel supports deterministic identity. Report exact commit, tag, versions, hashes, test evidence, remote checks, directory state, and any residual warning.
+3. When the repository is not already a coherent Plugin, run the Repo-to-Plugin conversion mode before generating configuration. Read `references/conversion-pipeline.md` and use `scripts/analyze_repo.py` to discover candidate workflows.
+4. Classify the target using `references/architectures.md` as `skills-only`, `MCP-backed`, or `hybrid`. Classify from declared active components and actual product behavior, not from stray `.app.json` or `.mcp.json` files.
+5. Run a public-distribution safety review before generating or packaging public Skills. Internal capability does not imply Plugin Directory suitability.
+6. Build or repair `.codex-plugin/plugin.json`, focused Skills, optional `agents/openai.yaml`, optional MCP/app configuration, optional hooks, square branding, and accurate public URLs.
+7. Enforce package shape before copywriting polish: only `plugin.json` inside `.codex-plugin/`; every intended Skill as an immediate real child directory of `skills/` with `SKILL.md`; no direct files or symlinks under `skills/` that are expected to import as Skills.
+8. Validate declared asset text as well as resolved files. Reject outer whitespace, control characters, absolute/drive paths, `..` traversal, package escapes, missing files, and invalid required branding dimensions.
+9. Validate `agents/openai.yaml` when present. Require its documented `interface` metadata and validate supported policy/dependency fields without pretending the local dependency-free checker replaces the official YAML/uploader implementation.
+10. Treat `.app.json` and `.mcp.json` as active only when the manifest declares `apps` or `mcpServers` respectively. Warn on undeclared root files because OpenAI ignores them. Validate declared mappings structurally before packaging.
+11. Apply final Plugin Directory limits, not only looser package-validation limits. Keep category, listing copy, starter prompts, URLs, branding, and capabilities within the current final rules.
+12. Run repository-native tests plus `scripts/validate_plugin.py` and fail closed on every blocking local preflight error.
+13. Build the ZIP twice with `scripts/package_plugin.py` and require byte-identical SHA256 results. Extract a fresh copy and validate the extraction again.
+14. Inspect archive root, files, counts, excluded capabilities, secrets/privacy boundary, package-relative paths, and installation behavior.
+15. Smoke a fresh install on every available ChatGPT/Codex surface. Prefer a repo/personal local marketplace when available and test the installed cached copy in a new chat. Do not claim unavailable surfaces were tested.
+16. Run the separate submission-readiness gate in `references/submission-checklist.md`. A valid ZIP is not automatically ready for public review.
+17. Diagnose uploader or review failures using `references/submission-errors.md`; repair root causes and every generated/runtime reference, then rerun the complete gate.
+18. Under Full Autopilot Publish, commit, tag, push, publish, and create releases without another routine confirmation only after all gates pass and only within the user's authorized release scope. Follow `references/release-playbook.md`.
+19. Download published artifacts and compare hashes or bytes whenever the channel supports deterministic identity. Report exact commit, tag, versions, hashes, test evidence, remote checks, directory state, and any residual warning.
+
+## Repo-to-Plugin conversion mode
+
+Use this mode when the input is an agentic repository whose useful workflows are not yet packaged correctly for ChatGPT/Codex.
+
+### Stage A: discover
+
+Run:
+
+```bash
+python3 <skill-root>/scripts/analyze_repo.py <target-repo> --json
+```
+
+Then invoke `agentic-repo-discovery` to inspect the candidate evidence and assign each capability one disposition: `preserve_skill`, `compile_skill`, `reference_only`, `runtime_dependency`, `internal_only`, or `discard`.
+
+Do not treat the analyzer as an automatic publisher. It intentionally over-surfaces plausible agentic material so a maintainer can set the public boundary deliberately.
+
+### Stage B: compile
+
+Use `workflow-to-skill-compiler` for selected playbooks, prompts, commands, runbooks, or agent definitions. Preserve source decision logic, tests, approval gates, stop conditions, and evidence requirements while removing machine-specific assumptions and hidden dependencies.
+
+Do not mechanically mirror repository structure. One source file may become part of another Skill, several fragments may become one Skill, and some internal capabilities should not appear publicly at all.
+
+### Stage C: design the Plugin experience
+
+Use `plugin-experience-architect` after the candidate Skill set exists. Design from the user's recurring job, not from internal folder names. Reduce discovery overlap, decide which apps are required or optional, and make listing capabilities and starter prompts correspond to actual packaged behavior.
+
+### Stage D: prove and prepare submission
+
+Run package preflight and deterministic packaging first. Only then use `submission-pack-builder` to assemble reviewer evidence, test cases, public exclusions, runtime/auth notes, listing fields, hashes, and status. If the host exposes a dedicated Skill Submission Pack Writer, it may format portal-facing copy after the evidence gate passes.
+
+Keep `analyzed`, `conversion planned`, `locally validated`, `submission ready`, `submitted`, `approved`, and `published` as separate states.
 
 ## Package preflight vs submission readiness
 
