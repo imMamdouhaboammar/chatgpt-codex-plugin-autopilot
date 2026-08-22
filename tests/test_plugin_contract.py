@@ -12,7 +12,7 @@ class PluginContractTests(unittest.TestCase):
     def test_manifest_declares_standalone_skill_only_plugin(self):
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(data["name"], "chatgpt-codex-plugin-autopilot")
-        self.assertEqual(data["version"], "0.3.0")
+        self.assertEqual(data["version"], "0.4.0")
         self.assertEqual(data["skills"], "./skills/")
         self.assertNotIn("mcpServers", data)
         self.assertNotIn("apps", data)
@@ -26,6 +26,7 @@ class PluginContractTests(unittest.TestCase):
         self.assertLessEqual(len(interface["developerName"]), 80)
         self.assertEqual(interface["category"], "Developer Tools")
         self.assertIn("Submission preflight", interface["capabilities"])
+        self.assertIn("Workflow-to-Skill conversion", interface["capabilities"])
         for key in ("websiteURL", "privacyPolicyURL", "termsOfServiceURL"):
             self.assertTrue(interface[key].startswith("https://"), key)
         self.assertNotIn("supportURL", interface)
