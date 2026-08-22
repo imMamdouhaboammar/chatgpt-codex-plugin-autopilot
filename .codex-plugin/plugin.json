@@ -12,7 +12,7 @@
   "interface": {
     "displayName": "Plugin Autopilot",
     "shortDescription": "Turn repos into plugins",
-    "longDescription": "Finds reusable agentic workflows inside repositories, decides what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, adds a host-native workspace operations Skill for read/list/search/grep/write/patch/shell/Python workflows, designs the Plugin experience and SVG identity, prepares Plugin Directory metadata, executes host-native Python verification when available, validates the package, builds deterministic ZIPs, and prepares reviewer evidence without confusing local proof with public approval.",
+    "longDescription": "Finds reusable agentic workflows inside repositories, decides what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, installs a host-native workspace operations Skill for read/list/search/grep/write/patch/shell/Python workflows, designs the Plugin experience and SVG identity, prepares Plugin Directory metadata, executes host-native Python verification when available, validates the package, builds deterministic ZIPs, and prepares reviewer evidence without confusing local proof with public approval.",
     "developerName": "Mamdouh Aboammar",
     "category": "Developer Tools",
     "capabilities": [
