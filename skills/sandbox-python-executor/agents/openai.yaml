@@ -1,0 +1,9 @@
+interface:
+  display_name: "Sandbox Python Executor"
+  short_description: "Run checks with Python"
+  default_prompt: "Use the python tool to execute the verification steps for this Plugin workflow and report execution evidence."
+policy:
+  products:
+    - CHAT
+    - CODEX
+  allow_implicit_invocation: true
