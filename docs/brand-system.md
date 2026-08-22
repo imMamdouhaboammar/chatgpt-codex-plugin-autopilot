@@ -36,7 +36,7 @@ The dark version preserves the same geometry rather than becoming a second logo 
 
 File: `assets/mark.svg`
 
-The existing compact mark remains the declared composer icon in 0.4.0. Future revisions may simplify the new convergence geometry further if small-size testing shows it reads better than the current icon. Do not change the composer icon solely for visual consistency without testing it at the actual small UI size.
+The existing compact mark remains the declared composer icon in the current Plugin contract. Future revisions may simplify the convergence geometry further if small-size testing shows it reads better than the current icon. Do not change the composer icon solely for visual consistency without testing it at the actual small UI size.
 
 ## Usage rules
 
