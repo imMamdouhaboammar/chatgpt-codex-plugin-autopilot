@@ -5,11 +5,11 @@ description: Use when converting an agentic repository into a ChatGPT/Codex Plug
 
 # ChatGPT/Codex Plugin Autopilot
 
-Take an arbitrary repository from agentic-workflow discovery to a verified ChatGPT/Codex Plugin artifact and, when explicitly authorized, through release/submission. Treat the target repository as authoritative for product behavior and release channels. Never require Riqor, Bun, Node, or a project-specific layout unless the target already requires it.
+Take an arbitrary repository from agentic-workflow discovery to a verified ChatGPT/Codex Plugin artifact and, when explicitly authorized, through release/submission. This repository is itself a ChatGPT/Codex Plugin and must remain capable of validating and packaging its own installed surface. Treat the target repository as authoritative for product behavior and release channels. Never require Riqor, Bun, Node, or a project-specific layout unless the target already requires it.
 
 ## Operating contract
 
-1. Verify the current official OpenAI Plugin and Skill documentation before editing public plugin configuration. Current official docs override remembered schema, examples, and numeric limits. Read `references/official-contract.md`, `references/branding-and-listing.md`, and record the verification date.
+1. Verify the current official OpenAI Plugin and Skill documentation before editing public plugin configuration. Current official docs override remembered schema, examples, and numeric limits. Read `references/official-contract.md`, `references/branding-and-listing.md`, `references/host-python-sandbox.md`, and record the verification date.
 2. Inspect repository instructions, dirty state, package metadata, manifests, Skills, MCP/app configuration, hooks, assets, legal/support pages, CI, tags, release scripts, and registry policy before changing anything.
 3. When the repository is not already a coherent Plugin, run the Repo-to-Plugin conversion mode before generating configuration. Read `references/conversion-pipeline.md` and use `scripts/analyze_repo.py` to discover candidate workflows.
 4. Classify the target using `references/architectures.md` as `skills-only`, `MCP-backed`, or `hybrid`. Classify from declared active components and actual product behavior, not from stray `.app.json` or `.mcp.json` files.
@@ -22,14 +22,15 @@ Take an arbitrary repository from agentic-workflow discovery to a verified ChatG
 11. Validate `agents/openai.yaml` when present. Require its documented `interface` metadata and validate supported policy/dependency fields without pretending the local dependency-free checker replaces the official YAML/uploader implementation.
 12. Treat `.app.json` and `.mcp.json` as active only when the manifest declares `apps` or `mcpServers` respectively. Warn on undeclared root files because OpenAI ignores them. Validate declared mappings structurally before packaging.
 13. Apply final Plugin Directory limits, not only looser package-validation limits. Keep category, listing copy, starter prompts, URLs, branding, and capabilities within the current final rules.
-14. Run repository-native tests plus `scripts/validate_plugin.py` and fail closed on every blocking local preflight error.
-15. Build the ZIP twice with `scripts/package_plugin.py` and require byte-identical SHA256 results. Extract a fresh copy and validate the extraction again.
-16. Inspect archive root, files, counts, excluded capabilities, secrets/privacy boundary, package-relative paths, and installation behavior.
-17. Smoke a fresh install on every available ChatGPT/Codex surface. Prefer a repo/personal local marketplace when available and test the installed cached copy in a new chat. Do not claim unavailable surfaces were tested.
-18. Run the separate submission-readiness gate in `references/submission-checklist.md`. A valid ZIP, polished logo, or complete listing is not automatically ready for public review.
-19. Diagnose uploader or review failures using `references/submission-errors.md`; repair root causes and every generated/runtime reference, then rerun the complete gate.
-20. Under Full Autopilot Publish, commit, tag, push, publish, and create releases without another routine confirmation only after all gates pass and only within the user's authorized release scope. Follow `references/release-playbook.md`.
-21. Download published artifacts and compare hashes or bytes whenever the channel supports deterministic identity. Report exact commit, tag, versions, hashes, test evidence, remote checks, directory state, and any residual warning.
+14. When the host exposes **host-native Python** and the workflow needs executable verification, invoke `sandbox-python-executor` and **execute the checks**. In ChatGPT, explicitly use the **python tool** when it is available. Do not merely print commands or code and then describe them as verified execution.
+15. Run repository-native tests plus `scripts/validate_plugin.py` and fail closed on every blocking local preflight error. Use the safest host execution facility available and accurately distinguish executed tests from static inspection.
+16. Build the ZIP twice with `scripts/package_plugin.py` and require byte-identical SHA256 results. Extract a fresh copy and validate the extraction again.
+17. Inspect archive root, files, counts, excluded capabilities, secrets/privacy boundary, package-relative paths, and installation behavior.
+18. Smoke a fresh install on every available ChatGPT/Codex surface. Prefer a repo/personal local marketplace when available and test the installed cached copy in a new chat. Do not claim unavailable surfaces were tested.
+19. Run the separate submission-readiness gate in `references/submission-checklist.md`. A valid ZIP, polished logo, or complete listing is not automatically ready for public review.
+20. Diagnose uploader or review failures using `references/submission-errors.md`; repair root causes and every generated/runtime reference, then rerun the complete gate.
+21. Under Full Autopilot Publish, commit, tag, push, publish, and create releases without another routine confirmation only after all gates pass and only within the user's authorized release scope. Follow `references/release-playbook.md`.
+22. Download published artifacts and compare hashes or bytes whenever the channel supports deterministic identity. Report exact commit, tag, versions, hashes, test evidence, remote checks, directory state, and any residual warning.
 
 ## Repo-to-Plugin conversion mode
 
@@ -75,11 +76,36 @@ The listing pack must include the public name, short/subtitle copy, long descrip
 
 Treat metadata as a routing surface. Build direct, indirect, and negative golden prompts and revise metadata when discovery precision/recall is poor.
 
-### Stage F: prove and prepare submission
+### Stage F: execute in the host sandbox
+
+Use `sandbox-python-executor` whenever the next claim depends on deterministic computation, file processing, package inspection, hashing, or the bundled Python validators/packagers.
+
+In ChatGPT, when the **python tool** is available, execute the relevant checks with that tool. Do not merely print commands and call them tested. Preserve execution evidence such as pass/fail status, important output, generated artifact paths, and hashes.
+
+If the Python tool is unavailable, say so and keep execution-dependent claims unverified. Do not invent a Code Interpreter dependency in `agents/openai.yaml`, do not add a remote arbitrary-code MCP server solely as a substitute, and do not fabricate results.
+
+### Stage G: prove and prepare submission
 
 Run package preflight and deterministic packaging first. Only then use `submission-pack-builder` to assemble reviewer evidence, positive/negative test cases, public exclusions, runtime/auth notes, listing fields, hashes, and status. If the host exposes a dedicated Skill Submission Pack Writer, it may format portal-facing copy after the evidence gate passes.
 
 Keep `analyzed`, `conversion planned`, `brand ready`, `listing ready`, `locally validated`, `submission ready`, `submitted`, `approved`, and `published` as separate states.
+
+## Host-native execution rule
+
+The Plugin remains skills-only. `sandbox-python-executor` is a workflow rule around execution capabilities supplied by ChatGPT or Codex; it is not an MCP server and does not grant new host permissions.
+
+When host-native Python is available and Python materially improves correctness:
+
+- use it for deterministic local work instead of mental simulation
+- prefer the bundled Autopilot scripts when they already implement the check
+- keep target-repository execution read-only by default
+- inspect untrusted target scripts before running them
+- do not assume sandbox internet access
+- return execution evidence
+
+When it is unavailable, state the limitation. Static analysis may continue, but do not claim that tests, validators, packagers, hashes, or generated files were executed.
+
+See `references/host-python-sandbox.md` for the OpenAI contract boundary.
 
 ## Package preflight vs submission readiness
 
@@ -126,6 +152,8 @@ A stale excluded slug in any public path or UTF-8 text file is a blocking failur
 
 ## Strict generic preflight
 
+When the host can execute Python, use `sandbox-python-executor` to actually run this sequence rather than only displaying it:
+
 ```bash
 python3 <skill-root>/scripts/validate_plugin.py <plugin-root> --json
 python3 <skill-root>/scripts/build_directory_pack.py <plugin-root> --json
@@ -153,9 +181,10 @@ These are regression contracts, not anecdotes:
 - a local marketplace/install success is useful evidence but not public directory approval
 - a package author or GitHub owner is not proof of the verified OpenAI developer identity
 - a good-looking logo or complete listing is not evidence that the artifact is technically valid or approved
+- a Plugin Skill can require real execution behavior but cannot fabricate host tool availability
 
 ## Stop conditions
 
 Stop before irreversible publication when current required OpenAI rules cannot be verified, repository identity is ambiguous, required credentials are unavailable, tests or validation fail, the target version already exists on an immutable registry, archive identity is nondeterministic when determinism is promised, public policy copy contradicts behavior, required publisher/legal listing facts are missing, the public submission surface requires evidence that cannot be produced honestly, or the requested action exceeds the user's authorized scope.
 
-Do not weaken tests, hide uploader failures, rewrite released tags, inject registry credentials into CI, force-push unrelated history, or claim a successful Plugin Directory submission when only a local ZIP was prepared.
+Do not weaken tests, hide uploader failures, rewrite released tags, inject registry credentials into CI, force-push unrelated history, claim sandbox execution that did not occur, or claim a successful Plugin Directory submission when only a local ZIP was prepared.
