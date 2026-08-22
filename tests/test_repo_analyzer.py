@@ -44,6 +44,14 @@ class RepoAnalyzerTests(unittest.TestCase):
             self.assertEqual(report["architecture"]["recommended"], "skills-only")
             self.assertGreaterEqual(report["summary"]["candidateCount"], 3)
             self.assertIn("compile_workflows", report["nextActions"])
+            self.assertIn("plan_host_workspace_capabilities", report["nextActions"])
+            self.assertIn("install_host_workspace_skill", report["nextActions"])
+            self.assertTrue(report["hostWorkspace"]["installRecommended"])
+            self.assertEqual(report["hostWorkspace"]["skill"], "host-workspace-operator")
+            self.assertEqual(
+                report["hostWorkspace"]["capabilities"],
+                ["read", "list", "search", "grep", "write", "patch", "shell", "python"],
+            )
 
     def test_recommends_hybrid_when_skills_and_explicit_mcp_are_present(self):
         with tempfile.TemporaryDirectory() as temp:
