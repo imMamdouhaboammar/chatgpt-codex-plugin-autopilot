@@ -12,7 +12,7 @@
   "interface": {
     "displayName": "Plugin Autopilot",
     "shortDescription": "Turn repos into plugins",
-    "longDescription": "Finds reusable agentic workflows inside existing repositories, helps decide what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs a clearer Plugin surface, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local validation with public approval.",
+    "longDescription": "Finds reusable agentic workflows inside existing repositories, helps decide what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs a clear Plugin experience and SVG brand identity, prepares Plugin Directory metadata, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local validation with public approval.",
     "developerName": "Mamdouh Aboammar",
     "category": "Developer Tools",
     "capabilities": [
@@ -20,6 +20,8 @@
       "Workflow-to-Skill conversion",
       "Plugin architecture planning",
       "Plugin experience design",
+      "SVG brand identity pack",
+      "Plugin Directory listing pack",
       "Plugin validation",
       "Submission preflight",
       "Deterministic packaging",
@@ -31,9 +33,9 @@
       "Find the reusable workflows in this repo and decide what should become Skills.",
       "Validate and package this Plugin for submission."
     ],
-    "brandColor": "#1F5EFF",
+    "brandColor": "#4F6FFF",
     "composerIcon": "./assets/mark.svg",
-    "logo": "./assets/mark.svg",
+    "logo": "./assets/logo-light.svg",
     "privacyPolicyURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/PRIVACY.md",
     "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md"
   },
