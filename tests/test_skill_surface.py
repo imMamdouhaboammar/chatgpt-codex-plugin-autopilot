@@ -9,6 +9,8 @@ FOCUSED_SKILLS = [
     "agentic-repo-discovery",
     "workflow-to-skill-compiler",
     "plugin-experience-architect",
+    "host-workspace-operator",
+    "sandbox-python-executor",
     "plugin-brand-identity-designer",
     "plugin-directory-listing-writer",
     "submission-pack-builder",
@@ -27,8 +29,11 @@ class SkillSurfaceTests(unittest.TestCase):
             "references/submission-checklist.md",
             "references/conversion-pipeline.md",
             "references/branding-and-listing.md",
+            "references/host-python-sandbox.md",
+            "references/host-workspace-capabilities.md",
             "scripts/analyze_repo.py",
             "scripts/build_directory_pack.py",
+            "scripts/install_host_workspace_skill.py",
             "scripts/validate_plugin.py",
             "scripts/package_plugin.py",
         ]
@@ -69,12 +74,15 @@ class SkillSurfaceTests(unittest.TestCase):
             "agentic-repo-discovery",
             "workflow-to-skill-compiler",
             "plugin-experience-architect",
+            "host-workspace-operator",
+            "sandbox-python-executor",
+            "install_host_workspace_skill.py",
             "plugin-brand-identity-designer",
             "plugin-directory-listing-writer",
             "submission-pack-builder",
             "build_directory_pack.py",
-            "conversion-pipeline.md",
-            "branding-and-listing.md",
+            "host-python-sandbox.md",
+            "host-workspace-capabilities.md",
         ):
             self.assertIn(phrase, text)
 
