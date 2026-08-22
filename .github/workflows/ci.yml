@@ -18,6 +18,9 @@ jobs:
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
 
+      - name: Directory listing pack
+        run: python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json
+
       - name: Self-check
         run: python3 scripts/self_check.py
 
@@ -38,5 +41,6 @@ jobs:
             dist/chatgpt-codex-plugin-autopilot-*.zip
             dist/SHA256SUMS
             submission/reviewer-packet.json
+            submission/listing.json
           if-no-files-found: error
           retention-days: 7
