@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Plugin Autopilot logo for dark surfaces">
+  <rect width="512" height="512" rx="112" fill="#0D1324"/>
+  <path d="M92 154h126v34H92a17 17 0 0 1 0-34Zm0 85h126v34H92a17 17 0 0 1 0-34Zm0 85h126v34H92a17 17 0 0 1 0-34Z" fill="#F4F7FF"/>
+  <path d="M211 171h38c26 0 47 21 47 47v76c0 26 21 47 47 47h19" fill="none" stroke="#7895FF" stroke-width="24" stroke-linecap="round"/>
+  <path d="M211 256h151" fill="none" stroke="#7895FF" stroke-width="24" stroke-linecap="round"/>
+  <path d="M211 341h38c26 0 47-21 47-47v-76c0-26 21-47 47-47h19" fill="none" stroke="#7895FF" stroke-width="24" stroke-linecap="round"/>
+  <rect x="346" y="128" width="78" height="256" rx="34" fill="#F4F7FF"/>
+  <circle cx="385" cy="256" r="16" fill="#0D1324"/>
+</svg>
