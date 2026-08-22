@@ -1,0 +1,9 @@
+interface:
+  display_name: "Host Workspace Operator"
+  short_description: "Read search and edit files"
+  default_prompt: "Inspect the workspace with native read/search tools first, then make only the authorized file changes and verify them with available host tools."
+policy:
+  products:
+    - CHAT
+    - CODEX
+  allow_implicit_invocation: true
