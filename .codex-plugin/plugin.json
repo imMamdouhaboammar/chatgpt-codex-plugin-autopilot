@@ -1,18 +1,18 @@
 {
   "name": "chatgpt-codex-plugin-autopilot",
-  "version": "0.4.0",
-  "description": "Convert agentic repositories into focused ChatGPT/Codex plugins, then validate, package, and prepare them for submission",
+  "version": "0.5.0",
+  "description": "Convert agentic repositories into focused ChatGPT/Codex plugins, execute available host-native Python verification, then validate, package, and prepare them for submission",
   "author": {
     "name": "Mamdouh Aboammar",
     "url": "https://github.com/imMamdouhaboammar"
   },
   "license": "MIT",
-  "keywords": ["chatgpt", "codex", "plugins", "skills", "agentic-workflows", "developer-tools", "release"],
+  "keywords": ["chatgpt", "codex", "plugins", "skills", "agentic-workflows", "python-sandbox", "developer-tools", "release"],
   "skills": "./skills/",
   "interface": {
     "displayName": "Plugin Autopilot",
     "shortDescription": "Turn repos into plugins",
-    "longDescription": "Finds reusable agentic workflows inside existing repositories, helps decide what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs a clear Plugin experience and SVG brand identity, prepares Plugin Directory metadata, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local validation with public approval.",
+    "longDescription": "Finds reusable agentic workflows inside existing repositories, decides what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs the Plugin experience and SVG identity, prepares Plugin Directory metadata, uses host-native Python for executable verification when available, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local proof with public approval.",
     "developerName": "Mamdouh Aboammar",
     "category": "Developer Tools",
     "capabilities": [
@@ -20,6 +20,7 @@
       "Workflow-to-Skill conversion",
       "Plugin architecture planning",
       "Plugin experience design",
+      "Sandbox Python execution",
       "SVG brand identity pack",
       "Plugin Directory listing pack",
       "Plugin validation",
@@ -31,7 +32,7 @@
     "defaultPrompt": [
       "Turn this agentic repository into a clean ChatGPT/Codex Plugin.",
       "Find the reusable workflows in this repo and decide what should become Skills.",
-      "Validate and package this Plugin for submission."
+      "Audit and package this Plugin, using the python tool to run verification when available."
     ],
     "brandColor": "#4F6FFF",
     "composerIcon": "./assets/mark.svg",
