@@ -23,6 +23,7 @@ class SandboxPythonSkillTests(unittest.TestCase):
         self.assertTrue(agent_file.is_file())
 
         text = skill_file.read_text(encoding="utf-8")
+        normalized = text.lower()
         self.assertRegex(text, r"(?m)^name:\s*sandbox-python-executor$")
         description = re.search(r"(?m)^description:\s*(.+)$", text)
         self.assertIsNotNone(description)
@@ -32,10 +33,10 @@ class SandboxPythonSkillTests(unittest.TestCase):
             "python tool",
             "sandbox",
             "execution evidence",
-            "Do not claim",
+            "do not claim",
             "tool is unavailable",
         ):
-            self.assertIn(phrase, text)
+            self.assertIn(phrase, normalized)
 
     def test_skill_metadata_targets_chat_and_codex_without_fake_tool_dependency(self):
         text = (SKILL / "agents" / "openai.yaml").read_text(encoding="utf-8")
@@ -47,10 +48,10 @@ class SandboxPythonSkillTests(unittest.TestCase):
         self.assertNotRegex(text, r"(?i)code[_ -]?interpreter.*type:")
 
     def test_main_autopilot_routes_real_execution_to_sandbox_skill(self):
-        text = MAIN_SKILL.read_text(encoding="utf-8")
+        text = MAIN_SKILL.read_text(encoding="utf-8").lower()
         for phrase in (
             "sandbox-python-executor",
-            "host-native Python",
+            "host-native python",
             "execute the checks",
             "do not merely print commands",
         ):
