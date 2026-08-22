@@ -1,6 +1,6 @@
 interface:
   display_name: "Plugin Autopilot"
-  short_description: "Build and ship plugins"
-  default_prompt: "Audit this repository and make its ChatGPT/Codex plugin production-ready."
+  short_description: "Turn repos into plugins"
+  default_prompt: "Inspect this agentic repository, find the reusable workflows, and turn the right ones into a production-ready ChatGPT/Codex Plugin."
 policy:
   allow_implicit_invocation: true
