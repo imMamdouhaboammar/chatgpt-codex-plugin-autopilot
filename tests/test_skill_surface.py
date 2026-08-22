@@ -9,6 +9,8 @@ FOCUSED_SKILLS = [
     "agentic-repo-discovery",
     "workflow-to-skill-compiler",
     "plugin-experience-architect",
+    "plugin-brand-identity-designer",
+    "plugin-directory-listing-writer",
     "submission-pack-builder",
 ]
 
@@ -24,7 +26,9 @@ class SkillSurfaceTests(unittest.TestCase):
             "references/submission-errors.md",
             "references/submission-checklist.md",
             "references/conversion-pipeline.md",
+            "references/branding-and-listing.md",
             "scripts/analyze_repo.py",
+            "scripts/build_directory_pack.py",
             "scripts/validate_plugin.py",
             "scripts/package_plugin.py",
         ]
@@ -65,8 +69,12 @@ class SkillSurfaceTests(unittest.TestCase):
             "agentic-repo-discovery",
             "workflow-to-skill-compiler",
             "plugin-experience-architect",
+            "plugin-brand-identity-designer",
+            "plugin-directory-listing-writer",
             "submission-pack-builder",
+            "build_directory_pack.py",
             "conversion-pipeline.md",
+            "branding-and-listing.md",
         ):
             self.assertIn(phrase, text)
 
