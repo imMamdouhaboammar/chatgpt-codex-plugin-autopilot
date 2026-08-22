@@ -165,7 +165,14 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
         next_actions.append("compile_workflows")
     if has_mcp or has_apps:
         next_actions.append("review_external_actions")
-    next_actions.extend(["design_plugin_experience", "validate_public_safety", "build_submission_pack"])
+    next_actions.extend([
+        "design_plugin_experience",
+        "validate_public_safety",
+        "design_brand_identity",
+        "build_directory_listing",
+        "validate_plugin",
+        "build_submission_pack",
+    ])
 
     warnings = []
     if len(files) >= max_files:
