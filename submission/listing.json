@@ -1,20 +1,22 @@
 {
   "name": "Plugin Autopilot",
   "subtitle": "Turn repos into plugins",
-  "description": "Finds reusable agentic workflows inside existing repositories, helps decide what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, designs a clear Plugin experience and SVG brand identity, prepares Plugin Directory metadata, validates the package contract, produces deterministic installable ZIPs, and prepares reviewer evidence without confusing local validation with public approval.",
+  "description": "Finds reusable agentic workflows inside repositories, decides what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, installs a host-native workspace operations Skill for read/list/search/grep/write/patch/shell/Python workflows, designs the Plugin experience and SVG identity, prepares Plugin Directory metadata, executes host-native Python verification when available, validates the package, builds deterministic ZIPs, and prepares reviewer evidence without confusing local proof with public approval.",
   "category": "Developer Tools",
   "developerName": "Mamdouh Aboammar",
   "websiteURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
   "customerSupportURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/SUPPORT.md",
   "privacyPolicyURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/PRIVACY.md",
   "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "packageName": "chatgpt-codex-plugin-autopilot",
   "capabilities": [
     "Agentic repository discovery",
     "Workflow-to-Skill conversion",
     "Plugin architecture planning",
     "Plugin experience design",
+    "Host workspace read/search/edit",
+    "Sandbox Python execution",
     "SVG brand identity pack",
     "Plugin Directory listing pack",
     "Plugin validation",
@@ -24,8 +26,8 @@
   ],
   "starterPrompts": [
     "Turn this agentic repository into a clean ChatGPT/Codex Plugin.",
-    "Find the reusable workflows in this repo and decide what should become Skills.",
-    "Validate and package this Plugin for submission."
+    "Find the reusable workflows and add safe host workspace operations where they help.",
+    "Audit and package this Plugin, using the python tool to run verification when available."
   ],
   "brand": {
     "concept": "Multiple repository workflows converge into one installable Plugin package.",
@@ -36,6 +38,10 @@
   "publisherVerification": {
     "required": true,
     "status": "verify-in-openai-platform-before-submission"
+  },
+  "hostCapabilities": {
+    "workspace": ["read", "list", "search", "grep", "write", "patch", "shell", "python"],
+    "note": "Host-native capabilities are used when available; the Plugin does not grant these permissions."
   },
   "note": "Repository-maintained evidence format for submission preparation. This is not an OpenAI upload schema."
 }
