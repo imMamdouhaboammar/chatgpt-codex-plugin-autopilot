@@ -12,7 +12,7 @@ class PluginContractTests(unittest.TestCase):
     def test_manifest_declares_standalone_skill_only_plugin(self):
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(data["name"], "chatgpt-codex-plugin-autopilot")
-        self.assertEqual(data["version"], "0.4.0")
+        self.assertEqual(data["version"], "0.5.0")
         self.assertEqual(data["skills"], "./skills/")
         self.assertNotIn("mcpServers", data)
         self.assertNotIn("apps", data)
@@ -25,13 +25,20 @@ class PluginContractTests(unittest.TestCase):
         self.assertLessEqual(len(interface["shortDescription"]), 30)
         self.assertLessEqual(len(interface["developerName"]), 80)
         self.assertEqual(interface["category"], "Developer Tools")
-        self.assertIn("Submission preflight", interface["capabilities"])
-        self.assertIn("Workflow-to-Skill conversion", interface["capabilities"])
-        self.assertIn("SVG brand identity pack", interface["capabilities"])
-        self.assertIn("Plugin Directory listing pack", interface["capabilities"])
+        for capability in (
+            "Workflow-to-Skill conversion",
+            "Host workspace read/search/edit",
+            "Sandbox Python execution",
+            "SVG brand identity pack",
+            "Plugin Directory listing pack",
+            "Submission preflight",
+        ):
+            self.assertIn(capability, interface["capabilities"])
         for key in ("websiteURL", "privacyPolicyURL", "termsOfServiceURL"):
             self.assertTrue(interface[key].startswith("https://"), key)
         self.assertNotIn("supportURL", interface)
+        for forbidden in ("grep", "write", "shell", "code_interpreter"):
+            self.assertNotIn(forbidden, data)
 
     def test_manifest_declares_required_square_branding_assets(self):
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
@@ -82,6 +89,10 @@ class PluginContractTests(unittest.TestCase):
         self.assertTrue(plugin["supportURL"].startswith("https://"))
         self.assertGreaterEqual(len(packet["positiveTests"]), 5)
         self.assertGreaterEqual(len(packet["negativeTests"]), 3)
+        self.assertEqual(
+            packet["hostCapabilities"]["workspace"],
+            ["read", "list", "search", "grep", "write", "patch", "shell", "python"],
+        )
         for case in packet["positiveTests"]:
             self.assertTrue(case["userPrompt"])
             self.assertTrue(case["expectedBehavior"])
@@ -105,6 +116,8 @@ class PluginContractTests(unittest.TestCase):
             ".agents/plugins/marketplace.json",
             "submission/reviewer-packet.json",
             "submission/listing.json",
+            "skills/host-workspace-operator/SKILL.md",
+            "skills/sandbox-python-executor/SKILL.md",
         ):
             self.assertTrue((ROOT / rel).is_file(), rel)
 
