@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 from collections import Counter
 from pathlib import Path
@@ -32,16 +33,21 @@ def safe_json(path: Path) -> dict:
 
 
 def iter_files(root: Path, max_files: int) -> Iterable[Path]:
+    """Yield eligible files deterministically while pruning ignored trees before descent."""
     count = 0
-    for path in sorted(root.rglob("*"), key=lambda p: p.as_posix().lower()):
-        if any(part in IGNORED_DIRS for part in path.relative_to(root).parts):
-            continue
-        if not path.is_file():
-            continue
-        yield path
-        count += 1
-        if count >= max_files:
-            return
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True, followlinks=False):
+        dirnames[:] = sorted(
+            (name for name in dirnames if name not in IGNORED_DIRS),
+            key=str.lower,
+        )
+        for filename in sorted(filenames, key=str.lower):
+            path = Path(dirpath) / filename
+            if not path.is_file():
+                continue
+            yield path
+            count += 1
+            if count >= max_files:
+                return
 
 
 def slugify(value: str) -> str:
@@ -130,8 +136,20 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
 
     has_existing_skills = any(candidate["kind"] == "existing_skill" for candidate in candidates)
     has_skill_candidates = any(candidate["recommendedTarget"] in {"preserve_skill", "compile_skill"} for candidate in candidates)
-    has_mcp = ".mcp.json" in relative_files or manifest["declaresMcp"]
-    has_apps = ".app.json" in relative_files or manifest["declaresApps"]
+
+    root_mcp_present = ".mcp.json" in relative_files
+    root_app_present = ".app.json" in relative_files
+
+    # Once a Plugin manifest exists, app/MCP architecture is defined by declared active
+    # components. Stray root files remain review evidence only. For an unshaped repo,
+    # explicit root config is still a meaningful conversion signal.
+    if manifest["present"]:
+        has_mcp = manifest["declaresMcp"]
+        has_apps = manifest["declaresApps"]
+    else:
+        has_mcp = root_mcp_present
+        has_apps = root_app_present
+
     has_hooks = "hooks/hooks.json" in relative_files or manifest["declaresHooks"] or any(
         item.startswith("hooks/") for item in relative_files
     )
@@ -150,12 +168,13 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
     if has_hooks:
         signals.append("hooks")
 
-    if has_mcp and has_skill_candidates:
+    has_external_runtime = has_mcp or has_apps
+    if has_external_runtime and has_skill_candidates:
         recommended = "hybrid"
-        reason = "The repository contains reusable Skill candidates and explicit MCP configuration."
-    elif has_mcp or has_apps:
+        reason = "The repository contains reusable Skill candidates and an active app/MCP integration boundary."
+    elif has_external_runtime:
         recommended = "MCP-backed"
-        reason = "The repository contains explicit external app/MCP integration signals."
+        reason = "The repository contains an active external app/MCP integration boundary."
     else:
         recommended = "skills-only"
         reason = "The reusable workflows can be distributed without requiring an external runtime."
@@ -163,7 +182,7 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
     next_actions = ["review_candidates"]
     if has_skill_candidates:
         next_actions.append("compile_workflows")
-    if has_mcp or has_apps:
+    if has_external_runtime:
         next_actions.append("review_external_actions")
     next_actions.extend([
         "design_plugin_experience",
@@ -177,9 +196,9 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
     warnings = []
     if len(files) >= max_files:
         warnings.append(f"scan stopped at maxFiles={max_files}; increase the limit for a complete inventory")
-    if (root / ".mcp.json").is_file() and not manifest["declaresMcp"] and manifest["present"]:
+    if root_mcp_present and manifest["present"] and not manifest["declaresMcp"]:
         warnings.append("root .mcp.json exists but the current plugin manifest does not declare mcpServers")
-    if (root / ".app.json").is_file() and not manifest["declaresApps"] and manifest["present"]:
+    if root_app_present and manifest["present"] and not manifest["declaresApps"]:
         warnings.append("root .app.json exists but the current plugin manifest does not declare apps")
 
     return {
@@ -194,7 +213,7 @@ def analyze(root: Path, max_files: int = 5000) -> dict:
         "architecture": {
             "recommended": recommended,
             "reason": reason,
-            "requiresHumanReview": bool(has_mcp or has_apps),
+            "requiresHumanReview": bool(has_external_runtime),
         },
         "manifest": manifest,
         "inventory": {
