@@ -92,6 +92,102 @@ def _has_control(value: str) -> bool:
     return any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
 
 
+def _package_member_mode(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> int | None:
+    try:
+        relative = path.relative_to(root)
+    except ValueError:
+        _error(errors, f"{label} path escapes plugin root")
+        return None
+    rel = relative.as_posix()
+    current = root
+    for part in relative.parts[:-1]:
+        current = current / part
+        try:
+            mode = current.lstat().st_mode
+        except FileNotFoundError:
+            if required:
+                _error(errors, missing_message or f"{label} parent is missing: {rel}")
+            return None
+        except OSError:
+            _error(errors, f"{label} parent is unreadable: {rel}")
+            return None
+        if stat.S_ISLNK(mode):
+            _error(errors, f"{label} parent must not be a symlink: {rel}")
+            return None
+        if not stat.S_ISDIR(mode):
+            _error(errors, f"{label} parent must be a directory: {rel}")
+            return None
+    try:
+        return path.lstat().st_mode
+    except FileNotFoundError:
+        if required:
+            _error(errors, missing_message or f"{label} is missing: {rel}")
+        return None
+    except OSError:
+        _error(errors, f"{label} is unreadable: {rel}")
+        return None
+
+
+def _regular_package_file(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> bool:
+    mode = _package_member_mode(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if mode is None:
+        return False
+    if not stat.S_ISREG(mode):
+        rel = path.relative_to(root).as_posix()
+        _error(errors, f"{label} must be a regular file: {rel}")
+        return False
+    return True
+
+
+def _real_package_directory(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> bool:
+    mode = _package_member_mode(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if mode is None:
+        return False
+    if not stat.S_ISDIR(mode):
+        rel = path.relative_to(root).as_posix()
+        _error(errors, f"{label} must be a real directory: {rel}")
+        return False
+    return True
+
+
 def _relative_file_path(
     root: Path,
     field: str,
@@ -128,9 +224,9 @@ def _relative_file_path(
         _error(errors, f"{field} path must identify a file inside the plugin: {value}")
         return None
 
-    candidate = (root / relative).resolve()
+    candidate = root / relative
     try:
-        candidate.relative_to(root.resolve())
+        candidate.relative_to(root)
     except ValueError:
         _error(errors, f"{field} path escapes plugin root: {value}")
         return None
@@ -166,20 +262,32 @@ def _component_path(
         return False
     candidate = root / expected
     if expected.endswith("/"):
-        if not candidate.is_dir():
-            _error(errors, f"manifest {field} directory is missing: ./{expected}")
-            return False
-    elif not candidate.is_file():
-        _error(errors, f"manifest {field} file is missing: ./{expected}")
-        return False
-    return True
+        return _real_package_directory(
+            root,
+            candidate,
+            f"manifest {field} directory",
+            errors,
+            missing_message=f"manifest {field} directory is missing: ./{expected}",
+        )
+    return _regular_package_file(
+        root,
+        candidate,
+        f"manifest {field} file",
+        errors,
+        missing_message=f"manifest {field} file is missing: ./{expected}",
+    )
 
 
 def _validate_codex_plugin_directory(root: Path, errors: list[str]) -> None:
     directory = root / ".codex-plugin"
-    if not directory.is_dir():
+    if not _real_package_directory(root, directory, ".codex-plugin directory", errors, required=False):
         return
-    for item in sorted(directory.iterdir(), key=lambda path: path.name):
+    try:
+        entries = sorted(directory.iterdir(), key=lambda path: path.name)
+    except OSError:
+        _error(errors, ".codex-plugin directory is unreadable")
+        return
+    for item in entries:
         if item.name != "plugin.json":
             _error(
                 errors,
@@ -310,8 +418,7 @@ def _validate_image(root: Path, field: str, value: object, errors: list[str]) ->
     candidate = _relative_file_path(root, f"interface.{field}", value, errors, required=True)
     if candidate is None:
         return
-    if not candidate.is_file():
-        _error(errors, f"interface.{field} asset is missing: {value}")
+    if not _regular_package_file(root, candidate, f"interface.{field} asset", errors):
         return
     if candidate.stat().st_size > MAX_IMAGE:
         _error(errors, f"interface.{field} image exceeds 5 MiB: {value}")
@@ -397,11 +504,8 @@ def _yaml_block_fields(lines: list[str], label: str, errors: list[str]) -> dict[
 
 def _validate_skill_agent_metadata(skill_dir: Path, errors: list[str], warnings: list[str]) -> None:
     path = skill_dir / "agents" / "openai.yaml"
-    if not path.exists():
-        return
     rel = f"skills/{skill_dir.name}/agents/openai.yaml"
-    if not path.is_file():
-        _error(errors, f"{rel} must be a regular file")
+    if not _regular_package_file(skill_dir, path, rel, errors, required=False):
         return
     try:
         text = path.read_text(encoding="utf-8")
@@ -431,8 +535,8 @@ def _validate_skill_agent_metadata(skill_dir: Path, errors: list[str], warnings:
                 required=True,
                 require_dot_prefix=False,
             )
-            if candidate is not None and not candidate.is_file():
-                _error(errors, f"{rel}: interface.{field} asset is missing: {value}")
+            if candidate is not None:
+                _regular_package_file(skill_dir, candidate, f"{rel} interface.{field} asset", errors)
 
     brand = interface.get("brand_color")
     if brand is not None and not HEX_COLOR.fullmatch(_yaml_unquote(brand)):
@@ -613,8 +717,13 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
 
     _validate_codex_plugin_directory(root, errors)
     manifest_path = root / ".codex-plugin" / "plugin.json"
-    if not manifest_path.is_file():
-        _error(errors, "missing .codex-plugin/plugin.json")
+    if not _regular_package_file(
+        root,
+        manifest_path,
+        "manifest .codex-plugin/plugin.json",
+        errors,
+        missing_message="missing .codex-plugin/plugin.json",
+    ):
         manifest: dict = {}
     else:
         manifest = _load_json(manifest_path, errors)
@@ -641,11 +750,11 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
     apps_declared = _component_path(root, manifest, "apps", ".app.json", errors) if "apps" in manifest else False
     if mcp_declared:
         _validate_mcp_manifest(root / ".mcp.json", errors)
-    elif (root / ".mcp.json").exists():
+    elif "mcpServers" not in manifest and (root / ".mcp.json").exists():
         _warning(warnings, "root .mcp.json is ignored because manifest mcpServers is not set to ./.mcp.json")
     if apps_declared:
         _validate_app_manifest(root / ".app.json", errors)
-    elif (root / ".app.json").exists():
+    elif "apps" not in manifest and (root / ".app.json").exists():
         _warning(warnings, "root .app.json is ignored because manifest apps is not set to ./.app.json")
 
     if "hooks" in manifest:
@@ -680,14 +789,21 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
             relative = skill_path_value[2:] if skill_path_value.startswith("./") else skill_path_value
             if relative.rstrip("/") != "skills":
                 _error(errors, f"manifest skills path must resolve to ./skills/: {skill_path_value}")
-            skill_root = (root / relative).resolve()
+            skill_root = root / relative
             try:
                 skill_root.relative_to(root)
             except ValueError:
                 _error(errors, f"manifest skills path escapes plugin root: {skill_path_value}")
                 skill_root = root / "__invalid__"
 
-        if skill_root.is_dir():
+        if _real_package_directory(
+            root,
+            skill_root,
+            "manifest skills directory",
+            errors,
+            required="skills" in manifest,
+            missing_message=f"manifest skills path is missing: {skill_path_value}",
+        ):
             for item in sorted(skill_root.iterdir(), key=lambda child: child.name):
                 if item.is_symlink() or not item.is_dir():
                     _error(errors, f"skills direct child must be a real directory containing SKILL.md; found: skills/{item.name}")
@@ -697,8 +813,13 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
                     _error(errors, f"skill directory must not be hidden: {directory.name}")
                     continue
                 definition = directory / "SKILL.md"
-                if not definition.is_file():
-                    _error(errors, f"skill directory is missing SKILL.md: {directory.name}")
+                if not _regular_package_file(
+                    root,
+                    definition,
+                    "skill definition",
+                    errors,
+                    missing_message=f"skill directory is missing SKILL.md: {directory.name}",
+                ):
                     continue
                 try:
                     skill_name, skill_description = _skill_metadata(definition)
@@ -728,8 +849,6 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
                     _error(errors, f"combined plugin and skill identity exceeds 64 characters: {skill_name}")
                 _validate_skill_agent_metadata(directory, errors, warnings)
             has_skills = bool(skills)
-        elif "skills" in manifest:
-            _error(errors, f"manifest skills path is missing: {skill_path_value}")
     else:
         _error(errors, "manifest skills must be a relative path string")
 
@@ -801,8 +920,8 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         else:
             for index, screenshot in enumerate(screenshots):
                 candidate = _relative_file_path(root, f"interface.screenshots[{index}]", screenshot, errors, require_dot_prefix=True)
-                if candidate is not None and not candidate.is_file():
-                    _error(errors, f"interface.screenshots[{index}] asset is missing: {screenshot}")
+                if candidate is not None:
+                    _regular_package_file(root, candidate, f"interface.screenshots[{index}] asset", errors)
 
     files, entry_count, total_bytes = _walk(root, errors, exclusions)
     if not exclusions:
