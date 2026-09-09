@@ -97,13 +97,13 @@ Plugin Autopilot stays dependency-free, so its local YAML check intentionally ta
 
 ## Undeclared `.app.json` and `.mcp.json`
 
-A root `.app.json` is ignored unless the plugin manifest sets:
+A root `.app.json` is imported only when the plugin manifest sets:
 
 ```json
 "apps": "./.app.json"
 ```
 
-A root `.mcp.json` is ignored unless the manifest sets:
+A root `.mcp.json` is imported only when the manifest sets:
 
 ```json
 "mcpServers": "./.mcp.json"
@@ -111,7 +111,7 @@ A root `.mcp.json` is ignored unless the manifest sets:
 
 Do not classify a plugin as MCP-backed merely because one of these files exists. Decide architecture from declared active components.
 
-When the file is accidental, remove it. When it is required, declare it and validate its content.
+For a Skills-only public ZIP, OpenAI rejects leftover `mcpServers` / `.mcp.json` (`mcp_configuration_excluded`) and leftover `apps` / `.app.json` (`app_configuration_excluded`). Local public preflight therefore fails closed on those undeclared root files instead of warning and packaging them. When the file is accidental, remove it. When it is required, declare it, switch to the With MCP path, and validate its content.
 
 ## `.app.json` failures
 

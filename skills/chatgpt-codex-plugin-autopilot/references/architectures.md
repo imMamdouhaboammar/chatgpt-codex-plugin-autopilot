@@ -35,7 +35,7 @@ There are two package-level compatibility mechanisms:
 - `mcpServers: "./.mcp.json"` for bundled MCP server configuration
 - `apps: "./.app.json"` for registered app/MCP connection mappings in local/workspace packages
 
-A root `.mcp.json` or `.app.json` without the corresponding manifest declaration is ignored and must not cause Autopilot to classify the plugin as MCP-backed.
+A root `.mcp.json` or `.app.json` without the corresponding manifest declaration must not cause Autopilot to classify the plugin as MCP-backed. Skills-only public packaging still rejects those undeclared files because they would fail `mcp_configuration_excluded` / `app_configuration_excluded` on upload.
 
 MCP-backed public submission has additional review requirements beyond package shape. Re-check the current OpenAI submission flow for production HTTPS server configuration, domain verification, tool scans, tool annotations/justifications, demo evidence, test cases, release notes, and OAuth reviewer access where applicable.
 
