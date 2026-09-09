@@ -1066,122 +1066,96 @@ def _parse_skill_frontmatter(text: str, skill_dir: str, errors: list[str]) -> tu
     return skill_name, skill_description
 
 
-def _yaml_unquote(value: str) -> str:
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    return value
-
-
-def _yaml_top_level_blocks(text: str, label: str, errors: list[str]) -> dict[str, list[str]]:
-    blocks: dict[str, list[str]] = {}
-    current: str | None = None
-    if "\t" in text:
-        _error(errors, f"{label} must use spaces for indentation")
-    for raw in text.splitlines():
-        stripped = raw.strip()
-        if not stripped or stripped.startswith("#"):
-            continue
-        if not raw.startswith((" ", "\t")):
-            match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_-]*):\s*(?:#.*)?", raw)
-            if not match:
-                _error(errors, f"{label} must use mapping entries at the top level")
-                current = None
-                continue
-            current = match.group(1)
-            blocks.setdefault(current, [])
-        elif current is not None:
-            blocks[current].append(raw)
-    return blocks
-
-
-def _yaml_block_fields(lines: list[str], label: str, errors: list[str]) -> dict[str, str]:
-    fields: dict[str, str] = {}
-    base_indent: int | None = None
-    for raw in lines:
-        if not raw.strip() or raw.lstrip().startswith("#"):
-            continue
-        indent = len(raw) - len(raw.lstrip(" "))
-        if base_indent is None:
-            base_indent = indent
-        if indent != base_indent:
-            continue
-        match = re.fullmatch(r"\s*([A-Za-z_][A-Za-z0-9_-]*):\s*(.*?)\s*", raw)
-        if not match:
-            _error(errors, f"{label} contains unsupported mapping syntax: {raw.strip()}")
-            continue
-        fields[match.group(1)] = match.group(2)
-    return fields
-
-
 def _validate_skill_agent_metadata(plugin_root: Path, skill_dir: Path, errors: list[str], warnings: list[str]) -> None:
     path = skill_dir / "agents" / "openai.yaml"
     rel = f"skills/{skill_dir.name}/agents/openai.yaml"
     text = _read_regular_package_text(plugin_root, path, rel, errors, required=False)
     if text is None:
         return
+    try:
+        parsed = _parse_restricted_yaml(text)
+    except _YamlError:
+        _error(errors, f"skill_agent_yaml_malformed: {rel} is malformed YAML")
+        return
+    if not isinstance(parsed, dict):
+        _error(errors, f"skill_agent_top_level_wrong_type: {rel} must contain a YAML mapping")
+        return
 
-    blocks = _yaml_top_level_blocks(text, rel, errors)
-    interface_lines = blocks.get("interface")
-    if interface_lines is None:
+    if "interface" not in parsed:
         _error(errors, f"{rel}: interface mapping is required")
         return
-    interface = _yaml_block_fields(interface_lines, f"{rel} interface", errors)
+    interface = parsed["interface"]
+    if not isinstance(interface, dict):
+        _error(errors, f"skill_agent_interface_wrong_type: {rel}: interface must be a YAML mapping")
+        return
+
     for field in ("display_name", "short_description"):
-        value = interface.get(field)
-        if value is None or not _yaml_unquote(value).strip():
+        value = interface.get(field, _MISSING)
+        if value is _MISSING or (isinstance(value, str) and not value.strip()) or value is None:
             _error(errors, f"{rel}: interface.{field} is required and must be non-empty")
+        elif not isinstance(value, str):
+            _error(errors, f"{rel}: interface.{field} must be a string")
 
     for field in ("icon_small", "icon_large"):
-        if field in interface:
-            value = _yaml_unquote(interface[field])
-            candidate = _relative_file_path(
-                skill_dir,
-                f"{rel} interface.{field}",
-                value,
-                errors,
-                required=True,
-                require_dot_prefix=False,
-            )
-            if candidate is not None:
-                _verify_regular_package_file(plugin_root, candidate, f"{rel} interface.{field} asset", errors)
+        if field not in interface:
+            continue
+        value = interface[field]
+        if not isinstance(value, str) or not value.strip():
+            _error(errors, f"{rel}: interface.{field} must be a non-empty string")
+            continue
+        candidate = _relative_file_path(
+            skill_dir,
+            f"{rel} interface.{field}",
+            value,
+            errors,
+            required=True,
+            require_dot_prefix=False,
+        )
+        if candidate is not None:
+            _verify_regular_package_file(plugin_root, candidate, f"{rel} interface.{field} asset", errors)
 
-    brand = interface.get("brand_color")
-    if brand is not None and not HEX_COLOR.fullmatch(_yaml_unquote(brand)):
-        _error(errors, f"{rel}: interface.brand_color must be a six-digit hex color")
-    prompt = interface.get("default_prompt")
-    if prompt is not None and not _yaml_unquote(prompt).strip():
-        _error(errors, f"{rel}: interface.default_prompt must be non-empty when provided")
+    if "brand_color" in interface:
+        brand = interface["brand_color"]
+        if not isinstance(brand, str) or not HEX_COLOR.fullmatch(brand):
+            _error(errors, f"{rel}: interface.brand_color must be a six-digit hex color")
+    if "default_prompt" in interface:
+        prompt = interface["default_prompt"]
+        if not isinstance(prompt, str):
+            _error(errors, f"{rel}: interface.default_prompt must be a string")
+        elif not prompt.strip():
+            _error(errors, f"{rel}: interface.default_prompt must be non-empty when provided")
 
-    if "policy" in blocks:
-        policy = _yaml_block_fields(blocks["policy"], f"{rel} policy", errors)
-        unsupported = sorted(set(policy) - {"products", "allow_implicit_invocation"})
-        for key in unsupported:
-            _error(errors, f"{rel}: unsupported policy field: {key}")
-        implicit = policy.get("allow_implicit_invocation")
-        if implicit is not None and _yaml_unquote(implicit).lower() not in {"true", "false"}:
-            _error(errors, f"{rel}: policy.allow_implicit_invocation must be true or false")
-        products = policy.get("products")
-        if products is not None:
-            raw = _yaml_unquote(products).strip()
-            if raw.startswith("[") and raw.endswith("]"):
-                values = [item.strip().strip("\"'") for item in raw[1:-1].split(",") if item.strip()]
-                if not values or any(item not in {"CHAT", "CODEX"} for item in values):
+    if "policy" in parsed:
+        policy = parsed["policy"]
+        if not isinstance(policy, dict):
+            _error(errors, f"skill_agent_policy_wrong_type: {rel}: policy must be a YAML mapping")
+        else:
+            unsupported = sorted(set(policy) - {"products", "allow_implicit_invocation"})
+            for key in unsupported:
+                _error(errors, f"{rel}: unsupported policy field: {key}")
+            implicit = policy.get("allow_implicit_invocation", _MISSING)
+            if implicit is not _MISSING and not isinstance(implicit, bool):
+                _error(errors, f"{rel}: policy.allow_implicit_invocation must be true or false")
+            products = policy.get("products", _MISSING)
+            if products is not _MISSING:
+                if (
+                    not isinstance(products, list)
+                    or not products
+                    or any(item not in {"CHAT", "CODEX"} for item in products)
+                    or len(products) != len(set(products))
+                ):
                     _error(errors, f"{rel}: policy.products may contain CHAT, CODEX, or both")
-            else:
-                _warning(
-                    warnings,
-                    f"{rel}: policy.products uses YAML syntax outside the dependency-free inline-list checker; official uploader remains authoritative",
-                )
 
-    if "dependencies" in blocks:
-        dependencies = _yaml_block_fields(blocks["dependencies"], f"{rel} dependencies", errors)
-        unsupported = sorted(set(dependencies) - {"tools"})
-        for key in unsupported:
-            _error(errors, f"{rel}: only dependencies.tools is supported; found {key}")
+    if "dependencies" in parsed:
+        dependencies = parsed["dependencies"]
+        if not isinstance(dependencies, dict):
+            _error(errors, f"skill_agent_dependencies_wrong_type: {rel}: dependencies must be a YAML mapping")
+        else:
+            unsupported = sorted(set(dependencies) - {"tools"})
+            for key in unsupported:
+                _error(errors, f"{rel}: only dependencies.tools is supported; found {key}")
 
-    known = {"interface", "policy", "dependencies"}
-    unknown = sorted(set(blocks) - known)
+    unknown = sorted(set(parsed) - {"interface", "policy", "dependencies"})
     if unknown:
         _warning(
             warnings,

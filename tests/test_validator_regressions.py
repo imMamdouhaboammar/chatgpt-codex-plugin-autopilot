@@ -176,6 +176,76 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any("agents/openai.yaml" in error for error in report["errors"]), report)
 
+    def test_rejects_malformed_openai_agent_yaml(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            agents = root / "skills" / "worker" / "agents"
+            agents.mkdir()
+            (agents / "openai.yaml").write_text(
+                "interface:\n"
+                "  display_name: Fixture\n"
+                "  short_description: Fixture plugin\n"
+                "policy:\n"
+                "  products: [CHAT\n",
+                encoding="utf-8",
+            )
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertTrue(
+                any("agents/openai.yaml" in error and "malformed" in error.lower() for error in report["errors"]),
+                report,
+            )
+
+    def test_rejects_wrong_typed_openai_agent_fields(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            agents = root / "skills" / "worker" / "agents"
+            agents.mkdir()
+            (agents / "openai.yaml").write_text(
+                "interface:\n"
+                "  display_name: 123\n"
+                "  short_description: Fixture plugin\n"
+                "policy:\n"
+                "  products: 1\n"
+                "  allow_implicit_invocation: yes-please\n",
+                encoding="utf-8",
+            )
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            joined = "\n".join(report["errors"]).lower()
+            self.assertIn("agents/openai.yaml", joined)
+            self.assertIn("string", joined)
+            self.assertIn("products", joined)
+
+    def test_accepts_quoted_and_list_openai_agent_metadata(self):
+        cases = (
+            "interface:\n"
+            "  display_name: \"Quoted Fixture\"\n"
+            "  short_description: \"Fixture plugin\"\n"
+            "policy:\n"
+            "  products: [CHAT, CODEX]\n"
+            "  allow_implicit_invocation: false\n",
+            "interface:\n"
+            "  display_name: Quoted Fixture\n"
+            "  short_description: Fixture plugin\n"
+            "policy:\n"
+            "  products:\n"
+            "    - CHAT\n"
+            "    - CODEX\n"
+            "  allow_implicit_invocation: true\n",
+        )
+        for document in cases:
+            with self.subTest(document=document), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "plugin"
+                write_fixture(root)
+                agents = root / "skills" / "worker" / "agents"
+                agents.mkdir()
+                (agents / "openai.yaml").write_text(document, encoding="utf-8")
+                proc, report = validate(root)
+                self.assertEqual(proc.returncode, 0, report)
+
     def test_rejects_invalid_declared_app_mapping(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
