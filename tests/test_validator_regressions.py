@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import struct
 import subprocess
 import tempfile
@@ -186,6 +187,20 @@ class ValidatorRegressionTests(unittest.TestCase):
             proc, report = validate(root)
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any("agents/openai.yaml" in error for error in report["errors"]), report)
+
+    def test_rejects_backslash_in_archive_member_name(self):
+        if "\\" in os.sep:
+            self.skipTest("host filesystem uses backslash separators")
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            (root / "assets" / "bad\\shot.txt").write_text("not a portable archive name\n", encoding="utf-8")
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertTrue(
+                any("backslash" in error.lower() for error in report["errors"]),
+                report,
+            )
 
     def test_rejects_screenshots_on_skills_only_packages(self):
         with tempfile.TemporaryDirectory() as temp:
