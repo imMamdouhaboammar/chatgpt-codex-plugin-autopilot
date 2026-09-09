@@ -150,6 +150,19 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("Local Proof", text)
         self.assertIn("Strategy A", text)
 
+    def test_contributing_and_product_boundaries(self):
+        contrib_path = ROOT / "CONTRIBUTING.md"
+        self.assertTrue(contrib_path.is_file())
+        text = contrib_path.read_text(encoding="utf-8")
+        self.assertIn("Primary Product", text)
+        self.assertIn("Secondary Subtrees", text)
+        self.assertIn("plugins/no-ai-slop", text)
+        self.assertIn("Local Verification Commands", text)
+        self.assertIn(".github/workflows/release.yml", text)
+
+        slop_readme = (ROOT / "plugins/no-ai-slop/README.md").read_text(encoding="utf-8")
+        self.assertIn("Canonical ID & Marketplace Namespace Advisory", slop_readme)
+
 
 if __name__ == "__main__":
     unittest.main()
