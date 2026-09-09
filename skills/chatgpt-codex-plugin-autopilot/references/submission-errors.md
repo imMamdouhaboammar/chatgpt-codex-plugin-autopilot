@@ -93,7 +93,7 @@ When a Skill includes `agents/openai.yaml`, it must contain the documented Skill
 
 Skill interface metadata belongs in `agents/openai.yaml`, not a generic `metadata` field in `SKILL.md`.
 
-Plugin Autopilot stays dependency-free, so its local YAML check intentionally targets the documented metadata subset. The official uploader remains authoritative for complete YAML parsing and future schema additions.
+Plugin Autopilot stays dependency-free and parses `agents/openai.yaml` with the same fail-closed YAML subset used for Skill frontmatter. Malformed YAML, wrong mapping/scalar/list types, and explicit tags are local preflight failures. The official uploader remains authoritative for complete YAML 1.2 coverage and future schema additions.
 
 ## Undeclared `.app.json` and `.mcp.json`
 

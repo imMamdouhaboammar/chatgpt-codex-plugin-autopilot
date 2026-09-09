@@ -49,7 +49,7 @@ ChatGPT and Codex initially discover Skills from metadata and load the full inst
 
 A Skill may define `skills/<skill>/agents/openai.yaml`. This is separate from the plugin manifest `interface` and uses snake_case fields.
 
-When the file is present:
+When the file is present, local preflight parses it as fail-closed YAML (no tags, anchors, or constructors) and then checks:
 
 - top level is a YAML mapping
 - `interface` is required
