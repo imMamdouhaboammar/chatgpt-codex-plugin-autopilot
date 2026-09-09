@@ -13,7 +13,7 @@ SKILL_REL = Path("skills/chatgpt-codex-plugin-autopilot")
 SURFACE = [
     Path(".codex-plugin"), Path("assets"), Path("skills"),
     Path("README.md"), Path("LICENSE"), Path("PRIVACY.md"),
-    Path("TERMS.md"), Path("SUPPORT.md"),
+    Path("TERMS.md"), Path("SUPPORT.md"), Path("SECURITY.md"),
 ]
 
 
