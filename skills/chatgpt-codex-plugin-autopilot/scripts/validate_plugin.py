@@ -761,14 +761,26 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         hook_value = manifest.get("hooks")
         if isinstance(hook_value, str):
             hook_path = _relative_file_path(root, "manifest hooks", hook_value, errors)
-            if hook_path is not None and not hook_path.is_file():
-                _error(errors, f"manifest hooks file is missing: {hook_value}")
+            if hook_path is not None:
+                _regular_package_file(
+                    root,
+                    hook_path,
+                    "manifest hooks file",
+                    errors,
+                    missing_message=f"manifest hooks file is missing: {hook_value}",
+                )
         elif isinstance(hook_value, list):
             for index, item in enumerate(hook_value):
                 if isinstance(item, str):
                     hook_path = _relative_file_path(root, f"manifest hooks[{index}]", item, errors)
-                    if hook_path is not None and not hook_path.is_file():
-                        _error(errors, f"manifest hooks file is missing: {item}")
+                    if hook_path is not None:
+                        _regular_package_file(
+                            root,
+                            hook_path,
+                            f"manifest hooks[{index}] file",
+                            errors,
+                            missing_message=f"manifest hooks file is missing: {item}",
+                        )
                 elif not isinstance(item, dict):
                     _error(errors, f"manifest hooks[{index}] must be a path or inline hooks object")
         elif not isinstance(hook_value, dict):
