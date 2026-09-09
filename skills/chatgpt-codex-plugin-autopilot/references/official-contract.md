@@ -132,7 +132,26 @@ A public skills-only submission does not publish a reference to an existing Chat
 
 An undeclared root `.mcp.json` is ignored by the importer and must not change package architecture classification. Skills-only public preflight still fails if that file would remain in the ZIP (`mcp_configuration_excluded`).
 
-The documented bundled MCP format accepts either a direct server map or a wrapped `mcp_servers` object. Server entries are configuration objects.
+The documented bundled MCP format accepts:
+- `mcpServers` object (standard/preferred camelCase for Codex/OpenAI plugins)
+- `mcp_servers` object (legacy snake_case wrapper; triggers a warning recommending `mcpServers`)
+- a direct server map `{ "<server-name>": { ... } }`
+
+### Server Configuration Schema (authoritative contract verified 2026-09)
+
+Each entry in the server map must be a configuration object specifying either a local stdio command or a remote endpoint URL:
+
+- **Local stdio transport:**
+  - `command`: required non-empty string (e.g. `npx`, `python3`, `node`)
+  - `args`: optional list of strings
+  - `env`: optional object with string keys and string values
+- **Remote / SSE / Streamable HTTP transport:**
+  - `url`: required non-empty HTTP/HTTPS URL string (remote endpoints must use `https://`; `http://` is restricted to localhost/127.0.0.1)
+  - `transport`: optional string (e.g. `streamable_http`, `sse`, `http`)
+  - `headers`: optional object with string keys and string values
+- **Target requirement:** each server configuration must declare at least `command` or `url` (`mcp_server_target_missing`).
+- **Forward compatibility:** unrecognized configuration fields are preserved with a warning.
+- **Deterministic local checks vs. external eligibility:** Local preflight verifies JSON syntax, object shapes, command/url presence, arg/env types, and HTTPS transport requirements. Remote endpoint uptime, OAuth token exchanges, and live tool schemas remain runtime/submission portal gates.
 
 ## Hooks
 

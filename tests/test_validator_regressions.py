@@ -369,6 +369,78 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertEqual(report["architecture"], "hybrid")
             self.assertTrue(any("custom UI" in warning for warning in report["warnings"]), report)
 
+    def test_validates_bundled_mcp_configuration_positive_and_negative(self):
+        # Positive case with stdio and remote servers, camelCase mcpServers, and forward-compatibility warning
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["mcpServers"] = "./.mcp.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            (root / ".mcp.json").write_text(
+                json.dumps({
+                    "mcpServers": {
+                        "local-tool": {
+                            "command": "python3",
+                            "args": ["tool.py"],
+                            "env": {"DEBUG": "1"},
+                            "experimental_option": True,
+                        },
+                        "remote-service": {
+                            "url": "https://mcp.example.com/sse",
+                            "transport": "sse",
+                            "headers": {"Authorization": "Bearer fake"},
+                        },
+                    }
+                }),
+                encoding="utf-8",
+            )
+            proc, report = validate(root)
+            self.assertEqual(proc.returncode, 0, report)
+            self.assertEqual(report["architecture"], "hybrid")
+            self.assertTrue(any("experimental_option" in w for w in report["warnings"]), report)
+
+        # Negative cases
+        negative_cases = (
+            (
+                {"mcpServers": {"demo": {}}},
+                "mcp_server_target_missing",
+            ),
+            (
+                {"mcpServers": {"demo": {"command": ""}}},
+                "mcp_server_command_invalid",
+            ),
+            (
+                {"mcpServers": {"demo": {"command": "tool", "args": "not-a-list"}}},
+                "mcp_server_args_invalid",
+            ),
+            (
+                {"mcpServers": {"demo": {"command": "tool", "env": {"NUM": 123}}}},
+                "mcp_server_env_invalid",
+            ),
+            (
+                {"mcpServers": {"demo": {"url": "http://remote-server.com/mcp"}}},
+                "mcp_server_url_insecure",
+            ),
+            (
+                {"mcpServers": {"demo": "not-a-dict"}},
+                ".mcp.json server config must be an object",
+            ),
+        )
+        for payload, expected_error in negative_cases:
+            with self.subTest(expected=expected_error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "plugin"
+                write_fixture(root)
+                manifest_path = root / ".codex-plugin" / "plugin.json"
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                manifest["mcpServers"] = "./.mcp.json"
+                manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+                (root / ".mcp.json").write_text(json.dumps(payload), encoding="utf-8")
+                proc, report = validate(root)
+                self.assertNotEqual(proc.returncode, 0, report)
+                self.assertTrue(any(expected_error in err for err in report["errors"]), report)
+
     def test_rejects_malformed_openai_agent_yaml(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
@@ -617,6 +689,68 @@ class ValidatorRegressionTests(unittest.TestCase):
             proc, report = validate(root)
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any(".mcp.json" in error for error in report["errors"]), report)
+
+    def test_unit_validate_mcp_manifest_shapes(self):
+        # 1. Valid local command stdio shape under mcpServers
+        data_stdio = {
+            "mcpServers": {
+                "sqlite": {
+                    "command": "uvx",
+                    "args": ["mcp-server-sqlite", "--db-path", "/tmp/test.db"],
+                    "env": {"DEBUG": "1"},
+                    "unrecognized_future_field": True,
+                }
+            }
+        }
+        errors: list[str] = []
+        warnings: list[str] = []
+        validator._validate_mcp_manifest(data_stdio, errors, warnings)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("unrecognized_future_field" in w for w in warnings))
+
+        # 2. Valid remote HTTPS shape under direct map
+        data_remote = {
+            "fetch": {
+                "url": "https://api.example.com/mcp",
+                "transport": "streamable_http",
+                "headers": {"Authorization": "Bearer token"},
+            }
+        }
+        errors.clear()
+        warnings.clear()
+        validator._validate_mcp_manifest(data_remote, errors, warnings)
+        self.assertEqual(errors, [])
+
+        # 3. Valid legacy mcp_servers with recommendation warning
+        data_legacy = {
+            "mcp_servers": {
+                "demo": {"command": "python3", "args": ["server.py"]}
+            }
+        }
+        errors.clear()
+        warnings.clear()
+        validator._validate_mcp_manifest(data_legacy, errors, warnings)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("mcpServers" in w and "camelCase" in w for w in warnings))
+
+        # 4. Negative cases
+        negative_cases = (
+            ({}, "mcp_servers_missing"),
+            ({"mcpServers": "not-a-dict"}, "mcp_servers_wrong_type"),
+            ({"mcpServers": {}}, ".mcp.json must contain a non-empty direct server map"),
+            ({"mcpServers": {"": {"command": "node"}}}, ".mcp.json server names must be non-empty strings"),
+            ({"mcpServers": {"server1": "not-an-object"}}, ".mcp.json server config must be an object"),
+            ({"mcpServers": {"server1": {"description": "no command or url"}}}, "mcp_server_target_missing"),
+            ({"mcpServers": {"server1": {"command": ""}}}, "mcp_server_command_invalid"),
+            ({"mcpServers": {"server1": {"command": "node", "args": "not-a-list"}}}, "mcp_server_args_invalid"),
+            ({"mcpServers": {"server1": {"command": "node", "env": ["not", "dict"]}}}, "mcp_server_env_invalid"),
+            ({"mcpServers": {"server1": {"url": "http://insecure.remote.com/mcp"}}}, "mcp_server_url_insecure"),
+        )
+        for val_data, expected_err in negative_cases:
+            errors.clear()
+            warnings.clear()
+            validator._validate_mcp_manifest(val_data, errors, warnings)
+            self.assertTrue(any(expected_err in e for e in errors), f"Expected {expected_err} in {errors} for {val_data}")
 
     def test_rejects_symlinked_manifest_before_parsing_external_target(self):
         with tempfile.TemporaryDirectory() as temp:
