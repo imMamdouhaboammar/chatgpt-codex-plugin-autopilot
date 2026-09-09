@@ -346,6 +346,8 @@ class ValidatorRegressionTests(unittest.TestCase):
             candidate.write_text('{"safe": true}\n', encoding="utf-8")
             outside = Path(temp) / "outside.json"
             outside.write_text('{"external-race-marker": true}\n', encoding="utf-8")
+            replacement = root / "replacement.json"
+            replacement.write_bytes(outside.read_bytes())
             errors: list[str] = []
             real_open = validator.os.open
             swapped = False
@@ -353,8 +355,7 @@ class ValidatorRegressionTests(unittest.TestCase):
             def swap_then_open(path, flags, *args, **kwargs):
                 nonlocal swapped
                 if not swapped and Path(path) == candidate:
-                    candidate.unlink()
-                    candidate.write_bytes(outside.read_bytes())
+                    validator.os.replace(replacement, candidate)
                     swapped = True
                 return real_open(path, flags, *args, **kwargs)
 
