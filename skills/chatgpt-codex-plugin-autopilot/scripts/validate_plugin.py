@@ -136,26 +136,6 @@ def _package_member_stat(
         return None
 
 
-def _package_member_mode(
-    root: Path,
-    path: Path,
-    label: str,
-    errors: list[str],
-    *,
-    required: bool = True,
-    missing_message: str | None = None,
-) -> int | None:
-    member = _package_member_stat(
-        root,
-        path,
-        label,
-        errors,
-        required=required,
-        missing_message=missing_message,
-    )
-    return member.st_mode if member is not None else None
-
-
 def _regular_package_file(
     root: Path,
     path: Path,
@@ -242,7 +222,13 @@ def _open_regular_package_file(
     if not stat.S_ISREG(before.st_mode):
         _error(errors, f"{label} must be a regular file: {rel}")
         return None
-    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_BINARY", 0)
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
     try:
         descriptor = os.open(path, flags)
     except (OSError, ValueError):
@@ -389,7 +375,11 @@ def _list_real_package_directory(
         _error(errors, f"{label} must remain a real directory while opening: {rel}")
         return None
     try:
-        after = os.fstat(descriptor)
+        try:
+            after = os.fstat(descriptor)
+        except OSError:
+            _error(errors, f"{label} could not be verified after opening: {rel}")
+            return None
         if not stat.S_ISDIR(after.st_mode) or not _same_member(before, after):
             _error(errors, f"{label} changed during validation: {rel}")
             return None
