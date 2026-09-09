@@ -265,6 +265,24 @@ class ValidatorRegressionTests(unittest.TestCase):
             assert_regular_file_error(self, report, "assets/icon.svg")
             self.assertFalse(any("image unreadable" in error.lower() for error in report["errors"]), report)
 
+    def test_rejects_symlinked_hook_path_after_lexical_path_hardening(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["hooks"] = "./hooks.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            target = Path(temp) / "outside-hooks.json"
+            target.write_text("{}\n", encoding="utf-8")
+            (root / "hooks.json").symlink_to(target)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, "hooks.json")
+            self.assertNotIn(str(target), json.dumps(report))
+
 
 if __name__ == "__main__":
     unittest.main()
