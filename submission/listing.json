@@ -8,7 +8,7 @@
   "customerSupportURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/SUPPORT.md",
   "privacyPolicyURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/PRIVACY.md",
   "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "packageName": "chatgpt-codex-plugin-autopilot",
   "capabilities": [
     "Agentic repository discovery",
@@ -40,7 +40,16 @@
     "status": "verify-in-openai-platform-before-submission"
   },
   "hostCapabilities": {
-    "workspace": ["read", "list", "search", "grep", "write", "patch", "shell", "python"],
+    "workspace": [
+      "read",
+      "list",
+      "search",
+      "grep",
+      "write",
+      "patch",
+      "shell",
+      "python"
+    ],
     "note": "Host-native capabilities are used when available; the Plugin does not grant these permissions."
   },
   "note": "Repository-maintained evidence format for submission preparation. This is not an OpenAI upload schema."

@@ -1,0 +1,54 @@
+# llms.txt — Machine-readable index for LLM agents
+# chatgpt-codex-plugin-autopilot v0.6.0
+# Copyright (c) 2026 Mamdouh Aboammar — MIT License
+# https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot
+# Standard: https://llmstxt.org
+
+# What this project is
+> Plugin Autopilot is a self-hosting ChatGPT/Codex Plugin that converts agentic repositories into focused, validated, deterministically packaged Plugins. It packages and validates the same Skills it uses to convert other repositories.
+
+## Core documentation
+
+- [README](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/README.md): Project overview, quick start, architecture, installation
+- [AGENTS.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/AGENTS.md): Agent interface contract — skills, scripts, operating rules
+- [CONTRIBUTING.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/CONTRIBUTING.md): Repository boundaries, verification gates, PR workflow, release provenance
+- [SECURITY.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/SECURITY.md): Vulnerability disclosure, trust boundaries, response process
+
+## Plugin manifest
+
+- [plugin.json](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/.codex-plugin/plugin.json): Authoritative plugin metadata — version, author, capabilities, URLs
+
+## Skills (9)
+
+- [chatgpt-codex-plugin-autopilot/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/chatgpt-codex-plugin-autopilot/SKILL.md): Main orchestrator skill
+- [agentic-repo-discovery/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/agentic-repo-discovery/SKILL.md): Repository workflow discovery
+- [workflow-to-skill-compiler/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/workflow-to-skill-compiler/SKILL.md): Workflow-to-Skill conversion
+- [plugin-experience-architect/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/plugin-experience-architect/SKILL.md): Plugin UX and architecture design
+- [host-workspace-operator/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/host-workspace-operator/SKILL.md): Native host workspace operations
+- [sandbox-python-executor/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/sandbox-python-executor/SKILL.md): Python execution evidence policy
+- [plugin-brand-identity-designer/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/plugin-brand-identity-designer/SKILL.md): SVG brand identity creation
+- [plugin-directory-listing-writer/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/plugin-directory-listing-writer/SKILL.md): Plugin Directory metadata
+- [submission-pack-builder/SKILL.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/submission-pack-builder/SKILL.md): Submission evidence assembly
+
+## Key scripts
+
+- [scripts/self_check.py](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/scripts/self_check.py): Release surface validation
+- [scripts/build_release.py](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/scripts/build_release.py): Deterministic ZIP builder
+- [skills/chatgpt-codex-plugin-autopilot/scripts/analyze_repo.py](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/chatgpt-codex-plugin-autopilot/scripts/analyze_repo.py): Agentic repo analyzer
+- [skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py): Plugin package validator
+- [skills/chatgpt-codex-plugin-autopilot/scripts/package_plugin.py](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/skills/chatgpt-codex-plugin-autopilot/scripts/package_plugin.py): Plugin packager
+
+## Tests
+
+- [tests/](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/tree/main/tests): 92 regression tests covering plugin contract, validator, distribution pack, skill surface, and workflow gates
+
+## Releases
+
+- Latest: https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/releases/latest
+- Changelog: https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/releases
+
+## Optional
+
+- [docs/omni-skill-profile.md](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/docs/omni-skill-profile.md): OmniSkill profile — trigger language, host support matrix, invariants
+- [submission/listing.json](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/submission/listing.json): Plugin Directory listing pack
+- [submission/reviewer-packet.json](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/submission/reviewer-packet.json): Reviewer evidence packet

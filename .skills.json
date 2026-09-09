@@ -1,0 +1,33 @@
+{
+  "name": "chatgpt-codex-plugin-autopilot",
+  "version": "0.6.0",
+  "description": "Convert agentic repositories into focused ChatGPT/Codex Plugins with validated, deterministic packaging",
+  "author": "Mamdouh Aboammar",
+  "license": "MIT",
+  "homepage": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
+  "repository": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
+  "skills": "./skills/",
+  "install": {
+    "type": "git",
+    "source": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot.git"
+  },
+  "tags": [
+    "chatgpt",
+    "codex",
+    "openai-plugin",
+    "agent-skill",
+    "agentic-workflow",
+    "developer-tools",
+    "automation",
+    "plugin-packaging",
+    "validation"
+  ],
+  "compatibility": [
+    "claude-code",
+    "codex",
+    "chatgpt",
+    "gemini-cli",
+    "cursor",
+    "antigravity"
+  ]
+}

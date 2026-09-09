@@ -1,5 +1,18 @@
 # ChatGPT/Codex Plugin Autopilot
 
+[![CI](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/imMamdouhaboammar/chatgpt-codex-plugin-autopilot?label=release&color=4F6FFF)](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/releases/latest)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Skills: 9](https://img.shields.io/badge/skills-9-blueviolet)](./skills/)
+[![Tests: 92](https://img.shields.io/badge/tests-92%20passing-brightgreen)](./tests/)
+[![Author: Mamdouh Aboammar](https://img.shields.io/badge/author-Mamdouh%20Aboammar-orange)](https://github.com/imMamdouhaboammar)
+
+> **Self-hosting Plugin autopilot** — convert agentic repositories into focused, validated, deterministically packaged ChatGPT/Codex Plugins.
+>
+> © 2026 **Mamdouh Aboammar** — MIT License
+
+---
+
 There are excellent agentic workflows sitting inside repositories that most people will never use.
 
 Sometimes they live in `AGENTS.md`. Sometimes they are buried in playbooks, prompts, custom agents, scripts, commands, or repo-specific conventions. They may work brilliantly for the original author and still be awkward to discover, install, or reuse in ChatGPT and Codex.
@@ -10,7 +23,37 @@ Give it an agentic repository. It finds the workflows worth sharing, helps decid
 
 And Plugin Autopilot is itself a Plugin. It packages and validates the same Skills it uses to convert other repositories.
 
-## The 0.5 flow
+## Install
+
+```bash
+# Clone and run the universal installer (links skills into all detected AI harnesses)
+git clone https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot.git
+bash chatgpt-codex-plugin-autopilot/install.sh
+
+# Or via npm/Bun
+bun add -g chatgpt-codex-plugin-autopilot
+# npx chatgpt-codex-plugin-autopilot
+```
+
+Supported AI harnesses: **Claude Code**, **Gemini CLI / Antigravity**, **Codex**, **Cursor**.
+
+## Quick start
+
+```bash
+# Analyze a repository for plugin conversion
+python3 skills/chatgpt-codex-plugin-autopilot/scripts/analyze_repo.py /path/to/repo --json
+
+# Validate an existing plugin package
+python3 skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py . --json
+
+# Build a verified release ZIP
+python3 scripts/build_release.py --out-dir dist
+
+# Run the full test suite
+python3 -m unittest discover -s tests -v
+```
+
+## The 0.6 flow
 
 ```text
 AGENTIC REPO
@@ -270,8 +313,72 @@ The Plugin Directory is the public discovery surface across ChatGPT and Codex. P
 
 The current OpenAI contract can change. Plugin Autopilot therefore requires re-checking official OpenAI documentation before public submission or when changing tool/dependency declarations.
 
+## Skills included (9)
+
+| Skill | Purpose |
+|---|---|
+| `chatgpt-codex-plugin-autopilot` | Main orchestrator — conversion, validation, packaging, submission |
+| `agentic-repo-discovery` | Find candidate agentic workflows and set the public/private boundary |
+| `workflow-to-skill-compiler` | Convert playbooks, commands, and prompts into portable Skills |
+| `plugin-experience-architect` | Define public Skill set, architecture, and discovery behavior |
+| `host-workspace-operator` | Native read/list/search/grep/write/patch/shell/Python operations |
+| `sandbox-python-executor` | Require real Python execution evidence when available |
+| `plugin-brand-identity-designer` | Create product-specific SVG identity (light + dark + icon) |
+| `plugin-directory-listing-writer` | Prepare accurate Plugin Directory fields and reviewer metadata |
+| `submission-pack-builder` | Assemble submission evidence without confusing local proof with approval |
+
+## Architecture
+
+```mermaid
+flowchart TD
+    A["Agentic Repository"] --> B["Discover\nSkills · Agents · Playbooks · Commands · Signals"]
+    B --> C["Decide\npreserve · compile · reference · runtime · discard"]
+    C --> D["Compile\nPortable Skills from real workflows"]
+    D --> E["Workspace\nhost-workspace-operator for read/write/shell/Python"]
+    E --> F["Execute\nPython verification with real evidence"]
+    F --> G["Design\nPlugin experience and public surface"]
+    G --> H["Brand\nSVG identity — light + dark + icon"]
+    H --> I["List\nPlugin Directory metadata and reviewer pack"]
+    I --> J["Prove\nTests → Preflight → Deterministic ZIP → Clean extraction"]
+    J --> K["Release\nVerified ZIP + SHA256SUMS on GitHub"]
+```
+
 ## Goal
 
 Make useful agentic workflows easier for other people to discover and use without stripping away the checks that make them reliable.
 
 A good conversion should leave users with a Plugin that can understand the job, inspect the relevant workspace, make only authorized changes, execute real verification when tools are available, explain what it actually did, and package the result cleanly for ChatGPT and Codex.
+
+## Copy-in, repo-owned
+
+You copy this template into your repo and run `./init.sh` once. From that point on the kit is yours — no external package, no upstream dependency at runtime. Edit the config, rename things, delete a skill you don't need.
+
+```bash
+# Clone into your project, then init
+git clone https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot.git
+bash chatgpt-codex-plugin-autopilot/init.sh
+```
+
+`init.sh` will:
+1. Verify Python 3 is available
+2. Read your `plugin.json` and confirm the author and version
+3. Count skills present in `skills/`
+4. Run `self_check.py` to verify the release surface
+5. Run the full test suite
+6. Print ownership confirmation and next steps
+
+After `init.sh` passes, the repository is yours. There are no upstream calls at runtime. A future packaged version (a plugin plus an installable engine) waits until the template has proven itself across a few real projects.
+
+> **A personal note from Mamdouh Aboammar:**
+> I built this for my own development work with AI coding agents. The principles and choices here reflect my own preferences and workflows — not a universal best practice. Take what's useful, change what isn't, and shape it to fit how you like to work.
+
+---
+
+## Author & license
+
+**Mamdouh Aboammar** — [github.com/imMamdouhaboammar](https://github.com/imMamdouhaboammar)
+
+© 2026 Mamdouh Aboammar. All rights reserved.
+Released under the [MIT License](./LICENSE).
+
+This repository — including all Skills, scripts, documentation, brand assets, and release tooling — is the original work of Mamdouh Aboammar. Contributions are welcome under the terms described in [CONTRIBUTING.md](./CONTRIBUTING.md).

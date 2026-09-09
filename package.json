@@ -1,0 +1,61 @@
+{
+  "name": "chatgpt-codex-plugin-autopilot",
+  "version": "0.6.0",
+  "description": "Self-hosting ChatGPT/Codex Plugin autopilot — find agentic workflows, compile Skills, package, validate, and release verified plugins",
+  "author": {
+    "name": "Mamdouh Aboammar",
+    "url": "https://github.com/imMamdouhaboammar"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot.git"
+  },
+  "keywords": [
+    "chatgpt",
+    "codex",
+    "openai-plugin",
+    "agent-skill",
+    "skills-sh",
+    "agentic-workflow",
+    "developer-tools",
+    "automation",
+    "llm-tools",
+    "plugin-autopilot",
+    "claude-code",
+    "gemini-cli",
+    "cursor",
+    "bun",
+    "python"
+  ],
+  "bin": {
+    "chatgpt-codex-plugin-autopilot": "./install.sh"
+  },
+  "scripts": {
+    "test": "python3 -m unittest discover -s tests -v",
+    "self-check": "python3 scripts/self_check.py",
+    "build": "python3 scripts/build_release.py --out-dir dist",
+    "install-skill": "bash install.sh"
+  },
+  "files": [
+    "skills/",
+    "assets/",
+    "scripts/",
+    "install.sh",
+    ".codex-plugin/",
+    ".skills.json",
+    "README.md",
+    "LICENSE",
+    "PRIVACY.md",
+    "TERMS.md",
+    "SUPPORT.md",
+    "SECURITY.md",
+    "AGENTS.md",
+    "llms.txt"
+  ],
+  "engines": {
+    "node": ">=18",
+    "bun": ">=1.0"
+  }
+}

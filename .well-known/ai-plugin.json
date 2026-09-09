@@ -1,0 +1,23 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "Plugin Autopilot",
+  "name_for_model": "plugin_autopilot",
+  "description_for_human": "Convert agentic repositories into focused ChatGPT/Codex Plugins with validated, deterministic packaging and release discipline.",
+  "description_for_model": "Plugin Autopilot discovers reusable agentic workflows inside repositories, decides what should become public Skills or runtime-backed capabilities, compiles portable Skill packages, installs a host-native workspace operations Skill for read/list/search/grep/write/patch/shell/Python workflows, designs the Plugin experience and SVG identity, prepares Plugin Directory metadata, executes host-native Python verification when available, validates the package, builds deterministic ZIPs, and prepares reviewer evidence without confusing local proof with public approval.",
+  "auth": {
+    "type": "none"
+  },
+  "api": {
+    "type": "skills",
+    "skills_url": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/tree/main/skills"
+  },
+  "logo_url": "https://raw.githubusercontent.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/main/assets/logo-light.svg",
+  "contact_email": "mamdouh@users.noreply.github.com",
+  "legal_info_url": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md",
+  "homepage_url": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot",
+  "version": "0.6.0",
+  "author": {
+    "name": "Mamdouh Aboammar",
+    "url": "https://github.com/imMamdouhaboammar"
+  }
+}

@@ -6,7 +6,7 @@
   "note": "Repository-maintained reviewer packet for preparing the OpenAI plugin submission form. This is not an OpenAI upload schema.",
   "plugin": {
     "name": "chatgpt-codex-plugin-autopilot",
-    "version": "0.5.1",
+    "version": "0.6.0",
     "architecture": "skills-only",
     "displayName": "Plugin Autopilot",
     "developerName": "Mamdouh Aboammar",
@@ -22,15 +22,42 @@
     "composerIcon": "./assets/mark.svg"
   },
   "skills": [
-    {"name": "chatgpt-codex-plugin-autopilot", "path": "./skills/chatgpt-codex-plugin-autopilot"},
-    {"name": "agentic-repo-discovery", "path": "./skills/agentic-repo-discovery"},
-    {"name": "workflow-to-skill-compiler", "path": "./skills/workflow-to-skill-compiler"},
-    {"name": "plugin-experience-architect", "path": "./skills/plugin-experience-architect"},
-    {"name": "host-workspace-operator", "path": "./skills/host-workspace-operator"},
-    {"name": "sandbox-python-executor", "path": "./skills/sandbox-python-executor"},
-    {"name": "plugin-brand-identity-designer", "path": "./skills/plugin-brand-identity-designer"},
-    {"name": "plugin-directory-listing-writer", "path": "./skills/plugin-directory-listing-writer"},
-    {"name": "submission-pack-builder", "path": "./skills/submission-pack-builder"}
+    {
+      "name": "chatgpt-codex-plugin-autopilot",
+      "path": "./skills/chatgpt-codex-plugin-autopilot"
+    },
+    {
+      "name": "agentic-repo-discovery",
+      "path": "./skills/agentic-repo-discovery"
+    },
+    {
+      "name": "workflow-to-skill-compiler",
+      "path": "./skills/workflow-to-skill-compiler"
+    },
+    {
+      "name": "plugin-experience-architect",
+      "path": "./skills/plugin-experience-architect"
+    },
+    {
+      "name": "host-workspace-operator",
+      "path": "./skills/host-workspace-operator"
+    },
+    {
+      "name": "sandbox-python-executor",
+      "path": "./skills/sandbox-python-executor"
+    },
+    {
+      "name": "plugin-brand-identity-designer",
+      "path": "./skills/plugin-brand-identity-designer"
+    },
+    {
+      "name": "plugin-directory-listing-writer",
+      "path": "./skills/plugin-directory-listing-writer"
+    },
+    {
+      "name": "submission-pack-builder",
+      "path": "./skills/submission-pack-builder"
+    }
   ],
   "starterPrompts": [
     "Turn this agentic repository into a clean ChatGPT/Codex Plugin.",
@@ -147,7 +174,16 @@
     }
   ],
   "hostCapabilities": {
-    "workspace": ["read", "list", "search", "grep", "write", "patch", "shell", "python"],
+    "workspace": [
+      "read",
+      "list",
+      "search",
+      "grep",
+      "write",
+      "patch",
+      "shell",
+      "python"
+    ],
     "boundary": "These are host-native operations used when available. The Plugin does not grant them or represent them as undocumented manifest permissions."
   },
   "availability": {
