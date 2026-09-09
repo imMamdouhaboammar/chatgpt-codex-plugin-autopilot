@@ -664,19 +664,406 @@ def _validate_image(root: Path, field: str, value: object, errors: list[str]) ->
         _error(errors, f"interface.{field} raster dimensions exceed 4096x4096: {value}")
 
 
-def _skill_metadata(text: str) -> tuple[str | None, str | None]:
+class _YamlError(ValueError):
+    def __init__(self, kind: str, message: str = "") -> None:
+        self.kind = kind
+        super().__init__(message or kind)
+
+
+_YAML_NULL = {"~", "null", "Null", "NULL"}
+_YAML_TRUE = {"true", "True", "TRUE"}
+_YAML_FALSE = {"false", "False", "FALSE"}
+_PLAIN_INT = re.compile(r"-?(?:0|[1-9]\d*)")
+_PLAIN_FLOAT = re.compile(r"-?(?:0|[1-9]\d*)\.\d+(?:[eE][-+]?\d+)?")
+_MISSING = object()
+_BLOCK_INDICATOR = re.compile(r"^([|>][+-]?)(?:\s+#.*)?\s*$")
+
+
+def _strip_plain_comment(text: str) -> str:
+    if text.startswith("#"):
+        return ""
+    idx = text.find(" #")
+    return text[:idx].rstrip() if idx >= 0 else text.rstrip()
+
+
+def _parse_quoted(text: str) -> tuple[str, str]:
+    if not text or text[0] not in {"'", '"'}:
+        raise _YamlError("malformed", "quoted scalar required")
+    quote = text[0]
+    i = 1
+    out: list[str] = []
+    if quote == "'":
+        while i < len(text):
+            char = text[i]
+            if char == "'":
+                if i + 1 < len(text) and text[i + 1] == "'":
+                    out.append("'")
+                    i += 2
+                    continue
+                return "".join(out), text[i + 1:]
+            out.append(char)
+            i += 1
+        raise _YamlError("malformed", "unclosed single quote")
+    while i < len(text):
+        char = text[i]
+        if char == '"':
+            return "".join(out), text[i + 1:]
+        if char == "\\":
+            if i + 1 >= len(text):
+                raise _YamlError("malformed", "truncated escape")
+            nxt = text[i + 1]
+            escapes = {"n": "\n", "t": "\t", "r": "\r", "\\": "\\", '"': '"'}
+            if nxt not in escapes:
+                raise _YamlError("malformed", "unsupported escape")
+            out.append(escapes[nxt])
+            i += 2
+            continue
+        out.append(char)
+        i += 1
+    raise _YamlError("malformed", "unclosed double quote")
+
+
+def _skip_flow_ws(text: str, index: int) -> int:
+    while index < len(text) and text[index] in " ":
+        index += 1
+    return index
+
+
+def _reject_yaml_prefix(text: str, index: int) -> None:
+    if index < len(text) and text[index] in "!&*":
+        if text[index] == "!":
+            raise _YamlError("tag")
+        raise _YamlError("malformed", "anchors and aliases are not allowed")
+
+
+def _parse_flow_value(text: str, index: int) -> tuple[object, int]:
+    index = _skip_flow_ws(text, index)
+    if index >= len(text):
+        raise _YamlError("malformed", "missing flow value")
+    _reject_yaml_prefix(text, index)
+    char = text[index]
+    if char == "[":
+        return _parse_flow_seq(text, index)
+    if char == "{":
+        return _parse_flow_map(text, index)
+    if char in {"'", '"'}:
+        value, rest = _parse_quoted(text[index:])
+        return value, index + len(text[index:]) - len(rest)
+    start = index
+    while index < len(text) and text[index] not in ",]}#":
+        index += 1
+    return _interpret_plain(text[start:index].strip()), index
+
+
+def _parse_flow_seq(text: str, index: int) -> tuple[list[object], int]:
+    if index >= len(text) or text[index] != "[":
+        raise _YamlError("malformed", "sequence must start with [")
+    index += 1
+    items: list[object] = []
+    expect_value = True
+    while True:
+        index = _skip_flow_ws(text, index)
+        if index >= len(text) or text[index] == "#":
+            raise _YamlError("malformed", "unterminated sequence")
+        if text[index] == "]":
+            return items, index + 1
+        if text[index] == ",":
+            if expect_value:
+                raise _YamlError("malformed", "empty sequence item")
+            expect_value = True
+            index += 1
+            continue
+        if not expect_value:
+            raise _YamlError("malformed", "missing comma in sequence")
+        value, index = _parse_flow_value(text, index)
+        items.append(value)
+        expect_value = False
+
+
+def _parse_flow_map(text: str, index: int) -> tuple[dict[str, object], int]:
+    if index >= len(text) or text[index] != "{":
+        raise _YamlError("malformed", "mapping must start with {")
+    index += 1
+    result: dict[str, object] = {}
+    expect_pair = True
+    while True:
+        index = _skip_flow_ws(text, index)
+        if index >= len(text) or text[index] == "#":
+            raise _YamlError("malformed", "unterminated mapping")
+        if text[index] == "}":
+            return result, index + 1
+        if text[index] == ",":
+            if expect_pair:
+                raise _YamlError("malformed", "empty mapping pair")
+            expect_pair = True
+            index += 1
+            continue
+        if not expect_pair:
+            raise _YamlError("malformed", "missing comma in mapping")
+        key, index = _parse_flow_key(text, index)
+        index = _skip_flow_ws(text, index)
+        if index >= len(text) or text[index] != ":":
+            raise _YamlError("malformed", "mapping pair requires a colon")
+        value, index = _parse_flow_value(text, index + 1)
+        if key in result:
+            raise _YamlError("malformed", "duplicate key")
+        result[key] = value
+        expect_pair = False
+
+
+def _parse_flow_key(text: str, index: int) -> tuple[str, int]:
+    index = _skip_flow_ws(text, index)
+    _reject_yaml_prefix(text, index)
+    if index < len(text) and text[index] in {"'", '"'}:
+        key, rest = _parse_quoted(text[index:])
+        return key, index + len(text[index:]) - len(rest)
+    start = index
+    while index < len(text) and text[index] not in ":,}#":
+        index += 1
+    key = text[start:index].strip()
+    if not key:
+        raise _YamlError("malformed", "empty mapping key")
+    return key, index
+
+
+def _interpret_plain(value: str) -> object:
+    if value in _YAML_NULL or value == "":
+        return None
+    if value in _YAML_TRUE:
+        return True
+    if value in _YAML_FALSE:
+        return False
+    if _PLAIN_INT.fullmatch(value):
+        return int(value)
+    if _PLAIN_FLOAT.fullmatch(value):
+        return float(value)
+    return value
+
+
+def _parse_value_token(token: str) -> object:
+    token = token.strip()
+    if not token or token.startswith("#"):
+        return None
+    _reject_yaml_prefix(token, 0)
+    if token[0] in {"'", '"'}:
+        value, rest = _parse_quoted(token)
+        leftover = _strip_plain_comment(rest).strip()
+        if leftover:
+            raise _YamlError("malformed", "unexpected content after quoted scalar")
+        return value
+    if token[0] == "[":
+        value, index = _parse_flow_seq(token, 0)
+        leftover = _strip_plain_comment(token[index:]).strip()
+        if leftover:
+            raise _YamlError("malformed", "unexpected content after sequence")
+        return value
+    if token[0] == "{":
+        value, index = _parse_flow_map(token, 0)
+        leftover = _strip_plain_comment(token[index:]).strip()
+        if leftover:
+            raise _YamlError("malformed", "unexpected content after mapping")
+        return value
+    return _interpret_plain(_strip_plain_comment(token).strip())
+
+
+def _split_mapping_line(content: str) -> tuple[str, str] | None:
+    if not content or content.startswith(("- ", "-", "#", "[", "{")):
+        return None
+    if content[0] in {"'", '"'}:
+        key, rest = _parse_quoted(content)
+        rest = rest.lstrip(" ")
+        if not rest.startswith(":"):
+            return None
+        return key, rest[1:]
+    for index, char in enumerate(content):
+        if char == ":" and (index + 1 == len(content) or content[index + 1] in " #"):
+            key = content[:index].rstrip()
+            if not key:
+                raise _YamlError("malformed", "empty mapping key")
+            return key, content[index + 1:]
+    return None
+
+
+class _RestrictedYamlParser:
+    def __init__(self, lines: list[str]) -> None:
+        self.lines = lines
+        self.i = 0
+
+    def skip_blank_comments(self) -> None:
+        while self.i < len(self.lines):
+            stripped = self.lines[self.i].strip()
+            if stripped == "" or stripped.startswith("#"):
+                self.i += 1
+                continue
+            break
+
+    def current_indent(self) -> int:
+        raw = self.lines[self.i]
+        return len(raw) - len(raw.lstrip(" "))
+
+    def parse_node(self, min_indent: int, *, allow_empty: bool = False) -> object:
+        self.skip_blank_comments()
+        if self.i >= len(self.lines):
+            if allow_empty:
+                return None
+            raise _YamlError("malformed", "missing YAML value")
+        indent = self.current_indent()
+        if indent < min_indent:
+            if allow_empty:
+                return None
+            raise _YamlError("malformed", "missing YAML value")
+        content = self.lines[self.i][indent:]
+        if content == "-" or content.startswith("- "):
+            return self.parse_block_seq(indent)
+        if _split_mapping_line(content) is not None:
+            return self.parse_block_map(indent)
+        self.i += 1
+        return _parse_value_token(content)
+
+    def parse_block_map(self, indent: int) -> dict[str, object]:
+        result: dict[str, object] = {}
+        while self.i < len(self.lines):
+            self.skip_blank_comments()
+            if self.i >= len(self.lines):
+                break
+            line_indent = self.current_indent()
+            if line_indent < indent:
+                break
+            if line_indent > indent:
+                raise _YamlError("malformed", "unexpected indentation")
+            content = self.lines[self.i][line_indent:]
+            pair = _split_mapping_line(content)
+            if pair is None:
+                break
+            key, rest = pair
+            if key in result:
+                raise _YamlError("malformed", "duplicate key")
+            self.i += 1
+            indicator = _BLOCK_INDICATOR.fullmatch(rest.strip())
+            if indicator:
+                result[key] = self.parse_block_scalar(indicator.group(1), indent)
+            elif rest.strip() == "" or rest.strip().startswith("#"):
+                self.skip_blank_comments()
+                if self.i < len(self.lines) and self.current_indent() > indent:
+                    result[key] = self.parse_node(indent + 1)
+                else:
+                    result[key] = None
+            else:
+                result[key] = _parse_value_token(rest)
+        if not result:
+            raise _YamlError("malformed", "empty mapping")
+        return result
+
+    def parse_block_seq(self, indent: int) -> list[object]:
+        items: list[object] = []
+        while self.i < len(self.lines):
+            self.skip_blank_comments()
+            if self.i >= len(self.lines):
+                break
+            line_indent = self.current_indent()
+            if line_indent != indent:
+                break
+            content = self.lines[self.i][line_indent:]
+            if content != "-" and not content.startswith("- "):
+                break
+            rest = "" if content == "-" else content[2:]
+            self.i += 1
+            indicator = _BLOCK_INDICATOR.fullmatch(rest.strip())
+            if indicator:
+                items.append(self.parse_block_scalar(indicator.group(1), indent))
+            elif rest.strip() == "" or rest.strip().startswith("#"):
+                self.skip_blank_comments()
+                if self.i < len(self.lines) and self.current_indent() > indent:
+                    items.append(self.parse_node(indent + 1))
+                else:
+                    items.append(None)
+            else:
+                items.append(_parse_value_token(rest))
+        return items
+
+    def parse_block_scalar(self, indicator: str, parent_indent: int) -> str:
+        chunks: list[str] = []
+        content_indent: int | None = None
+        while self.i < len(self.lines):
+            raw = self.lines[self.i]
+            if raw.strip() == "":
+                chunks.append("")
+                self.i += 1
+                continue
+            line_indent = len(raw) - len(raw.lstrip(" "))
+            if line_indent <= parent_indent:
+                break
+            if content_indent is None:
+                content_indent = line_indent
+            if line_indent < content_indent:
+                break
+            chunks.append(raw[content_indent:])
+            self.i += 1
+        while chunks and chunks[-1] == "":
+            chunks.pop()
+        if indicator.startswith(">"):
+            return " ".join(chunk for chunk in chunks if chunk != "")
+        return "\n".join(chunks)
+
+
+def _parse_restricted_yaml(text: str) -> object:
+    if "\t" in text:
+        raise _YamlError("malformed", "tabs are not allowed")
+    parser = _RestrictedYamlParser(text.splitlines())
+    value = parser.parse_node(0, allow_empty=True)
+    parser.skip_blank_comments()
+    if parser.i < len(parser.lines):
+        raise _YamlError("malformed", "unexpected trailing content")
+    return value
+
+
+def _normalize_skill_text(value: str) -> str:
+    return " ".join(value.split())
+
+
+def _parse_skill_frontmatter(text: str, skill_dir: str, errors: list[str]) -> tuple[str | None, str | None] | None:
     if not text.startswith("---\n"):
-        return None, None
+        _error(errors, f"skill_frontmatter_missing: SKILL.md must start with YAML front matter: {skill_dir}")
+        return None
     end = text.find("\n---", 4)
     if end < 0:
-        return None, None
-    frontmatter = text[4:end]
-    name = re.search(r"(?m)^name:\s*[\"']?([^\n\"']+)", frontmatter)
-    description = re.search(r"(?m)^description:\s*(.+)$", frontmatter)
-    return (
-        " ".join(name.group(1).split()) if name else None,
-        " ".join(description.group(1).strip("\"'").split()) if description else None,
-    )
+        _error(errors, f"skill_frontmatter_unclosed: SKILL.md YAML front matter must end with ---: {skill_dir}")
+        return None
+    try:
+        parsed = _parse_restricted_yaml(text[4:end])
+    except _YamlError as exc:
+        if exc.kind == "tag":
+            _error(errors, f"skill_frontmatter_yaml_malformed: SKILL.md frontmatter rejects explicit YAML tags: {skill_dir}")
+        else:
+            _error(errors, f"skill_frontmatter_yaml_malformed: SKILL.md frontmatter is malformed YAML: {skill_dir}")
+        return None
+    if not isinstance(parsed, dict):
+        _error(errors, f"skill_frontmatter_wrong_type: SKILL.md frontmatter must contain a YAML mapping: {skill_dir}")
+        return None
+
+    name = parsed.get("name", _MISSING)
+    description = parsed.get("description", _MISSING)
+    skill_name: str | None = None
+    skill_description: str | None = None
+    if name is _MISSING:
+        _error(errors, f"skill name is required: {skill_dir}")
+    elif not isinstance(name, str):
+        _error(errors, f"skill name must be a string: {skill_dir}")
+    else:
+        skill_name = _normalize_skill_text(name)
+        if not skill_name:
+            _error(errors, f"skill name is required: {skill_dir}")
+            skill_name = None
+    if description is _MISSING:
+        _error(errors, f"skill description is required: {skill_dir}")
+    elif not isinstance(description, str):
+        _error(errors, f"skill description must be a string: {skill_dir}")
+    else:
+        skill_description = _normalize_skill_text(description)
+        if not skill_description:
+            _error(errors, f"skill description is required: {skill_dir}")
+            skill_description = None
+    return skill_name, skill_description
 
 
 def _yaml_unquote(value: str) -> str:
@@ -1067,20 +1454,20 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
                     if skill_text is None:
                         continue
                     try:
-                        skill_name, skill_description = _skill_metadata(skill_text)
+                        parsed = _parse_skill_frontmatter(skill_text, directory.name, errors)
                     except Exception as exc:
                         _error(errors, f"skill definition unreadable: {directory.name}: {exc}")
                         continue
-                    if not skill_name:
-                        _error(errors, f"skill name is required: {directory.name}")
-                    elif skill_name in skill_names:
-                        _error(errors, f"skill name must be unique within plugin: {skill_name}")
-                    else:
-                        skill_names.add(skill_name)
-                        skills.append(skill_name)
-                    if not skill_description:
-                        _error(errors, f"skill description is required: {directory.name}")
-                    elif len(skill_description) > 1024:
+                    if parsed is None:
+                        continue
+                    skill_name, skill_description = parsed
+                    if skill_name:
+                        if skill_name in skill_names:
+                            _error(errors, f"skill name must be unique within plugin: {skill_name}")
+                        else:
+                            skill_names.add(skill_name)
+                            skills.append(skill_name)
+                    if skill_description and len(skill_description) > 1024:
                         _error(errors, f"skill description exceeds 1024 characters: {directory.name}")
                     front_end = skill_text.find("\n---", 4)
                     body = skill_text[front_end + 4:].strip() if front_end >= 0 else ""

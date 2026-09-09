@@ -1,6 +1,6 @@
 # Official OpenAI Plugin Contract Baseline
 
-Checked against official OpenAI documentation on 2026-08-22. Re-check these pages at the start of every public plugin task because package and submission rules can change:
+Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
 
 - https://developers.openai.com/plugins/concepts/plugins
 - https://developers.openai.com/plugins/concepts/skills
@@ -41,7 +41,7 @@ A Skill is an immediate child directory of `skills/` with a required regular `SK
 
 Files or symlinks directly under `skills/` are not imported as Skills. Plugin Autopilot treats those ignored entries as a strict-preflight failure so intended capabilities cannot silently disappear from a release artifact.
 
-`SKILL.md` needs YAML front matter with non-empty `name` and `description`, followed by non-empty instructions. The combined `plugin-name:skill-name` identity must fit the current limit, and Skill names must be unique within one plugin. OpenAI normalizes outer/internal whitespace during import. The Skill metadata name does not need to equal the directory name under the current documented contract.
+`SKILL.md` needs valid YAML front matter that parses to a mapping with non-empty string `name` and `description`, followed by non-empty instructions. Malformed YAML, a non-mapping document, wrong-typed fields, and explicit YAML tags are local preflight failures. The combined `plugin-name:skill-name` identity must fit the current limit, and Skill names must be unique within one plugin. OpenAI normalizes outer/internal whitespace during import. The Skill metadata name does not need to equal the directory name under the current documented contract.
 
 ChatGPT and Codex initially discover Skills from metadata and load the full instructions after selection. Keep discovery copy precise and trigger-oriented rather than making every Skill generic.
 
