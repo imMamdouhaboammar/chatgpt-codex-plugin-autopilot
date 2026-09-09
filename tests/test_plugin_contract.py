@@ -109,6 +109,7 @@ class PluginContractTests(unittest.TestCase):
             "PRIVACY.md",
             "TERMS.md",
             "SUPPORT.md",
+            "SECURITY.md",
             "LICENSE",
             "assets/mark.svg",
             "assets/logo-light.svg",
@@ -120,6 +121,16 @@ class PluginContractTests(unittest.TestCase):
             "skills/sandbox-python-executor/SKILL.md",
         ):
             self.assertTrue((ROOT / rel).is_file(), rel)
+
+    def test_security_policy_contract_and_support_routing(self):
+        security_text = (ROOT / "SECURITY.md").read_text(encoding="utf-8")
+        support_text = (ROOT / "SUPPORT.md").read_text(encoding="utf-8")
+        self.assertIn("security/advisories/new", security_text)
+        self.assertIn("Do not disclose suspected security vulnerabilities or sensitive evidence in public", security_text)
+        self.assertIn("Fail-Closed Fallback Route", security_text)
+        self.assertIn("Trust Boundaries", security_text)
+        self.assertIn("SECURITY.md", support_text)
+        self.assertIn("Security Vulnerabilities", support_text)
 
 
 if __name__ == "__main__":
