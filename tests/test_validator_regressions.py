@@ -337,7 +337,7 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertTrue(any("manifest skills path" in error for error in report["errors"]), report)
             self.assertNotIn("outside-skill-marker", report["skills"])
 
-    def test_verified_reader_rejects_file_replaced_by_symlink_before_open(self):
+    def test_verified_reader_rejects_file_replaced_by_regular_file_before_open(self):
         validator = load_validator_module()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
@@ -354,7 +354,7 @@ class ValidatorRegressionTests(unittest.TestCase):
                 nonlocal swapped
                 if not swapped and Path(path) == candidate:
                     candidate.unlink()
-                    candidate.symlink_to(outside)
+                    candidate.write_bytes(outside.read_bytes())
                     swapped = True
                 return real_open(path, flags, *args, **kwargs)
 
@@ -362,7 +362,7 @@ class ValidatorRegressionTests(unittest.TestCase):
                 result = validator._read_regular_package_bytes(root, candidate, "metadata", errors)
 
             self.assertIsNone(result)
-            self.assertTrue(errors, errors)
+            self.assertTrue(any("changed during validation" in error for error in errors), errors)
             self.assertNotIn("external-race-marker", "\n".join(errors))
             self.assertNotIn(str(outside), "\n".join(errors))
 
