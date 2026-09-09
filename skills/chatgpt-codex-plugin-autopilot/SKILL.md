@@ -204,7 +204,7 @@ Check at minimum:
 - `host-workspace-operator` is present when the Plugin's conversion plan requires local workspace operations
 - Skill frontmatter is valid YAML (mapping with non-empty string `name` and `description`), body/identity are valid, and names are unique
 - optional `agents/openai.yaml` is valid
-- declared app/MCP files are structurally valid; undeclared root files do not alter architecture
+- declared app/MCP files are structurally valid; undeclared `.app.json` / `.mcp.json` do not alter architecture and fail Skills-only public preflight
 - package contains no secrets, bytecode, symlinks, excluded capabilities, normalization collisions, or local absolute user paths
 - deterministic packager produces the same bytes from the same source
 
@@ -249,7 +249,7 @@ Repository-native quality, security, domain acceptance, and smoke checks remain 
 - missing `interface.logo` or `interface.composerIcon` blocks directory branding validation
 - a path such as `./assets/../assets/icon.svg` is unsafe even if it resolves inside the package
 - extra files inside `.codex-plugin/` are misplaced
-- undeclared `.app.json` / `.mcp.json` do not activate app/MCP capability
+- undeclared `.app.json` / `.mcp.json` do not activate app/MCP capability and cannot remain in a Skills-only ZIP
 - Skill metadata `name` and directory slug are separate contracts
 - `agents/openai.yaml` must be validated when bundled
 - host-native read/write/search/grep/shell/patch/Python capabilities must not be represented as invented manifest dependencies

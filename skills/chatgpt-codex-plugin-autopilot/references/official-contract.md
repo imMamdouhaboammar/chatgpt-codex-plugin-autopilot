@@ -107,7 +107,7 @@ Manifest branding assets should use `./`-prefixed paths. Screenshots are package
 "apps": "./.app.json"
 ```
 
-An undeclared root `.app.json` is ignored.
+An undeclared root `.app.json` is ignored by the importer and must not change architecture classification. Skills-only public preflight still fails if that file would remain in the ZIP (`app_configuration_excluded`).
 
 For local/workspace packages, `.app.json` uses a top-level `apps` object. Each alias maps to an object with a required string `id`; optional `optional` and `required` values must be booleans when supplied. The official submission error reference defines the current accepted ID families. The package/build documentation also documents current `plugin_asdk_app...` developer-mode IDs, so re-check both pages when validating a newly generated mapping.
 
@@ -121,7 +121,7 @@ A public skills-only submission does not publish a reference to an existing Chat
 "mcpServers": "./.mcp.json"
 ```
 
-An undeclared root `.mcp.json` is ignored and must not change package architecture classification.
+An undeclared root `.mcp.json` is ignored by the importer and must not change package architecture classification. Skills-only public preflight still fails if that file would remain in the ZIP (`mcp_configuration_excluded`).
 
 The documented bundled MCP format accepts either a direct server map or a wrapped `mcp_servers` object. Server entries are configuration objects.
 

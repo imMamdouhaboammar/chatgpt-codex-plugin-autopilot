@@ -25,7 +25,7 @@ Choose one architecture from actual requirements, not from files that happen to 
 - MCP-backed: external tools or service capability provided through MCP
 - Hybrid: bundled Skills plus MCP capability
 
-A root `.app.json` or `.mcp.json` that is not declared by the manifest is ignored by the package importer. Treat that as a warning and confirm whether the file should be removed or declared.
+A root `.app.json` or `.mcp.json` that is not declared by the manifest is ignored by the package importer, but a Skills-only public ZIP cannot contain it. Remove the file or declare the matching component and use With MCP.
 
 ## Gate 3: Final directory listing
 

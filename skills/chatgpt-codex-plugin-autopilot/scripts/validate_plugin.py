@@ -1359,12 +1359,20 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         mcp_data = _load_json_package_file(root, root / ".mcp.json", errors, ".mcp.json")
         _validate_mcp_manifest(mcp_data, errors)
     elif "mcpServers" not in manifest and (root / ".mcp.json").exists():
-        _warning(warnings, "root .mcp.json is ignored because manifest mcpServers is not set to ./.mcp.json")
+        _error(
+            errors,
+            "mcp_configuration_excluded: Skills-only packages must not include root .mcp.json; "
+            "declare mcpServers and submit With MCP, or remove the file",
+        )
     if apps_declared:
         app_data = _load_json_package_file(root, root / ".app.json", errors, ".app.json")
         _validate_app_manifest(app_data, errors)
     elif "apps" not in manifest and (root / ".app.json").exists():
-        _warning(warnings, "root .app.json is ignored because manifest apps is not set to ./.app.json")
+        _error(
+            errors,
+            "app_configuration_excluded: Skills-only packages must not include root .app.json; "
+            "declare apps and submit With MCP, or remove the file",
+        )
 
     if "hooks" in manifest:
         hook_value = manifest.get("hooks")

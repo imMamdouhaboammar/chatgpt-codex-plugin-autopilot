@@ -8,6 +8,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py"
+PACKAGER = ROOT / "skills/chatgpt-codex-plugin-autopilot/scripts/package_plugin.py"
 
 
 def square_svg() -> str:
@@ -95,7 +96,7 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any(".codex-plugin" in error and "plugin.json" in error for error in report["errors"]), report)
 
-    def test_undeclared_mcp_file_is_ignored_for_architecture(self):
+    def test_undeclared_mcp_file_fails_skills_only_preflight_without_changing_architecture(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
             write_fixture(root)
@@ -103,9 +104,46 @@ class ValidatorRegressionTests(unittest.TestCase):
                 json.dumps({"mcp_servers": {"demo": {"url": "https://example.com/mcp"}}}), encoding="utf-8"
             )
             proc, report = validate(root)
-            self.assertEqual(proc.returncode, 0, report)
+            self.assertNotEqual(proc.returncode, 0, report)
             self.assertEqual(report["architecture"], "skills-only")
-            self.assertTrue(any(".mcp.json" in warning and "ignored" in warning.lower() for warning in report["warnings"]), report)
+            self.assertTrue(
+                any("mcp_configuration_excluded" in error and ".mcp.json" in error for error in report["errors"]),
+                report,
+            )
+
+    def test_undeclared_app_file_fails_skills_only_preflight_without_changing_architecture(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            (root / ".app.json").write_text(
+                json.dumps({"apps": {"demo": {"id": "connector_demo"}}}), encoding="utf-8"
+            )
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertEqual(report["architecture"], "skills-only")
+            self.assertTrue(
+                any("app_configuration_excluded" in error and ".app.json" in error for error in report["errors"]),
+                report,
+            )
+
+    def test_packager_blocks_skills_only_zip_with_undeclared_mcp_or_app(self):
+        for filename, code in ((".mcp.json", "mcp_configuration_excluded"), (".app.json", "app_configuration_excluded")):
+            with self.subTest(filename=filename), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "plugin"
+                write_fixture(root)
+                (root / filename).write_text("{}\n", encoding="utf-8")
+                output = Path(temp) / "plugin.zip"
+                proc = subprocess.run(
+                    ["python3", str(PACKAGER), str(root), str(output), "--json"],
+                    cwd=ROOT,
+                    text=True,
+                    capture_output=True,
+                )
+                combined = f"{proc.stdout}\n{proc.stderr}"
+                self.assertNotEqual(proc.returncode, 0, combined)
+                self.assertFalse(output.exists(), combined)
+                self.assertIn(code, combined)
+                self.assertIn(filename, combined)
 
     def test_skill_metadata_name_does_not_have_to_match_directory_name(self):
         with tempfile.TemporaryDirectory() as temp:
