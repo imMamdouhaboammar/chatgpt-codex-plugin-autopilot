@@ -1261,18 +1261,63 @@ def _validate_app_manifest(data: dict, errors: list[str], warnings: list[str] | 
                 _error(errors, f".app.json {alias}.{field} must be true or false")
 
 
-def _validate_mcp_manifest(data: dict, errors: list[str]) -> None:
+def _validate_mcp_manifest(data: dict, errors: list[str], warnings: list[str] | None = None) -> None:
     if not data:
+        _error(errors, "mcp_servers_missing: .mcp.json must contain the top-level mcpServers field")
         return
-    servers = data.get("mcp_servers") if "mcp_servers" in data else data
+    if "mcpServers" in data:
+        servers = data.get("mcpServers")
+    elif "mcp_servers" in data:
+        servers = data.get("mcp_servers")
+        _warning(warnings, ".mcp.json uses legacy 'mcp_servers' wrapper; 'mcpServers' (camelCase) is preferred for Codex/OpenAI plugins")
+    else:
+        servers = data
     if not isinstance(servers, dict) or not servers:
-        _error(errors, ".mcp.json must contain a non-empty direct server map or mcp_servers object")
+        _error(errors, ".mcp.json must contain a non-empty direct server map, mcpServers, or mcp_servers object")
         return
     for name, config in servers.items():
-        if not isinstance(name, str) or not name:
+        if not isinstance(name, str) or not name.strip():
             _error(errors, ".mcp.json server names must be non-empty strings")
+            continue
         if not isinstance(config, dict):
             _error(errors, f".mcp.json server config must be an object: {name}")
+            continue
+        has_command = "command" in config
+        has_url = "url" in config
+        if not has_command and not has_url:
+            _error(errors, f"mcp_server_target_missing: .mcp.json server '{name}' must specify either 'command' or 'url'")
+        if has_command:
+            cmd = config["command"]
+            if not isinstance(cmd, str) or not cmd.strip():
+                _error(errors, f"mcp_server_command_invalid: .mcp.json server '{name}' command must be a non-empty string")
+            if "args" in config:
+                args = config["args"]
+                if not isinstance(args, list) or any(not isinstance(arg, str) for arg in args):
+                    _error(errors, f"mcp_server_args_invalid: .mcp.json server '{name}' args must be a list of strings")
+            if "env" in config:
+                env = config["env"]
+                if not isinstance(env, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in env.items()):
+                    _error(errors, f"mcp_server_env_invalid: .mcp.json server '{name}' env must be an object with string keys and string values")
+        if has_url:
+            url = config["url"]
+            if not isinstance(url, str) or not url.strip():
+                _error(errors, f"mcp_server_url_invalid: .mcp.json server '{name}' url must be a non-empty string")
+            elif url.startswith("http://") and not (url.startswith("http://localhost") or url.startswith("http://127.0.0.1")):
+                _error(errors, f"mcp_server_url_insecure: .mcp.json server '{name}' remote endpoint must use HTTPS: {url}")
+            elif not url.startswith("https://") and not (url.startswith("http://localhost") or url.startswith("http://127.0.0.1")):
+                _error(errors, f"mcp_server_url_invalid: .mcp.json server '{name}' url must be an HTTP/HTTPS URL: {url}")
+            if "transport" in config:
+                transport = config["transport"]
+                if not isinstance(transport, str) or not transport.strip():
+                    _error(errors, f".mcp.json server '{name}' transport must be a non-empty string")
+            if "headers" in config:
+                headers = config["headers"]
+                if not isinstance(headers, dict) or any(not isinstance(k, str) or not isinstance(v, str) for k, v in headers.items()):
+                    _error(errors, f".mcp.json server '{name}' headers must be an object with string keys and string values")
+        known_keys = {"command", "args", "env", "url", "transport", "headers", "description", "enabled"}
+        extra_keys = sorted(set(config) - known_keys)
+        if extra_keys:
+            _warning(warnings, f".mcp.json server '{name}' contains unrecognized fields retained for forward compatibility: {', '.join(extra_keys)}")
 
 
 def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Path], int, int]:
@@ -1413,7 +1458,7 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
     apps_declared = _component_path(root, manifest, "apps", ".app.json", errors) if "apps" in manifest else False
     if mcp_declared:
         mcp_data = _load_json_package_file(root, root / ".mcp.json", errors, ".mcp.json")
-        _validate_mcp_manifest(mcp_data, errors)
+        _validate_mcp_manifest(mcp_data, errors, warnings)
     elif "mcpServers" not in manifest and (root / ".mcp.json").exists():
         _error(
             errors,
