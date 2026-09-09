@@ -452,6 +452,96 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any(".app.json" in error for error in report["errors"]), report)
 
+
+    def test_declared_app_duplicate_id_warns_and_passes_preflight(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["apps"] = "./.app.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            (root / ".app.json").write_text(
+                json.dumps({
+                    "apps": {
+                        "primary": {"id": "connector_sample_app"},
+                        "secondary": {"id": "connector_sample_app"},
+                    }
+                }),
+                encoding="utf-8",
+            )
+            proc, report = validate(root)
+            self.assertEqual(proc.returncode, 0, report)
+            self.assertTrue(report.get("ok"), report)
+            self.assertEqual(report.get("errors"), [])
+            warnings = report.get("warnings", [])
+            self.assertTrue(
+                any(
+                    "duplicate_app_reference" in w
+                    and "connector_sample_app" in w
+                    and "secondary" in w
+                    and "primary" in w
+                    for w in warnings
+                ),
+                warnings,
+            )
+
+            # Confirm packaging succeeds with warning
+            zip_path = Path(temp) / "plugin.zip"
+            pack_proc = subprocess.run(
+                ["python3", str(PACKAGER), str(root), str(zip_path)],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(pack_proc.returncode, 0, pack_proc.stderr)
+            self.assertTrue(zip_path.exists())
+
+    def test_declared_app_duplicate_id_preserves_field_validation_errors(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["apps"] = "./.app.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            (root / ".app.json").write_text(
+                json.dumps({
+                    "apps": {
+                        "primary": {"id": "connector_sample_app"},
+                        "secondary": {"id": "connector_sample_app", "required": "not-a-bool"},
+                    }
+                }),
+                encoding="utf-8",
+            )
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertFalse(report.get("ok"), report)
+            errors = report.get("errors", [])
+            warnings = report.get("warnings", [])
+            self.assertTrue(any(".app.json secondary.required must be true or false" in err for err in errors), errors)
+            self.assertTrue(any("duplicate_app_reference" in w for w in warnings), warnings)
+
+    def test_unit_validate_app_manifest_duplicate_warning(self):
+        validator = load_validator_module()
+        data = {
+            "apps": {
+                "alias1": {"id": "connector_service"},
+                "alias2": {"id": "connector_service"},
+                "alias3": {"id": "connector_service"},
+            }
+        }
+        errors: list[str] = []
+        warnings: list[str] = []
+        validator._validate_app_manifest(data, errors, warnings)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(warnings), 2)
+        self.assertTrue(all("duplicate_app_reference" in w and "connector_service" in w for w in warnings))
+
+        # Backward compatibility when warnings is omitted or None
+        errors_legacy: list[str] = []
+        validator._validate_app_manifest(data, errors_legacy)
+        self.assertEqual(errors_legacy, [])
+
     def test_rejects_invalid_declared_mcp_mapping(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
