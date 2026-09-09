@@ -1,0 +1,60 @@
+name: 'ChatGPT & Codex Plugin Autopilot'
+description: 'Discover agentic workflows, validate plugin contracts, and package deterministic ChatGPT/Codex plugins.'
+author: 'Mamdouh Aboammar'
+branding:
+  icon: 'package'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to repository or plugin directory'
+    required: false
+    default: '.'
+  action:
+    description: 'Operation to perform: auto | analyze | validate | package | build-directory-pack'
+    required: false
+    default: 'auto'
+  output-dir:
+    description: 'Output directory for packaged release artifacts'
+    required: false
+    default: 'dist'
+  fail-on-error:
+    description: 'Fail the step if validation errors are encountered'
+    required: false
+    default: 'true'
+  summary:
+    description: 'Generate markdown summary in GitHub Step Summary'
+    required: false
+    default: 'true'
+
+outputs:
+  ok:
+    description: 'True if operation succeeded without errors'
+    value: ${{ steps.autopilot.outputs.ok }}
+  architecture:
+    description: 'Detected or declared architecture (skills-only, mcp-backed, hybrid)'
+    value: ${{ steps.autopilot.outputs.architecture }}
+  skills-count:
+    description: 'Number of detected or validated skills'
+    value: ${{ steps.autopilot.outputs.skills_count }}
+  plugin-path:
+    description: 'Path to the built ZIP archive (if packaged)'
+    value: ${{ steps.autopilot.outputs.plugin_path }}
+  sha256:
+    description: 'SHA-256 digest of the built ZIP archive (if packaged)'
+    value: ${{ steps.autopilot.outputs.sha256 }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: autopilot
+      shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_ACTION: ${{ inputs.action }}
+        INPUT_OUTPUT_DIR: ${{ inputs.output-dir }}
+        INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+        INPUT_SUMMARY: ${{ inputs.summary }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: |
+        python3 "${ACTION_PATH}/scripts/action_entrypoint.py"

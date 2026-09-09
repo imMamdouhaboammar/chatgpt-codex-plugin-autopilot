@@ -8,7 +8,7 @@
   "customerSupportURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/SUPPORT.md",
   "privacyPolicyURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/PRIVACY.md",
   "termsOfServiceURL": "https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/blob/main/TERMS.md",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "packageName": "chatgpt-codex-plugin-autopilot",
   "capabilities": [
     "Agentic repository discovery",

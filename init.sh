@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
-# init.sh — Copy-in, repo-owned engine initializer
-# chatgpt-codex-plugin-autopilot v0.6.0
-#
-# Run this once after copying the template into your repo.
+# chatgpt-codex-plugin-autopilot v0.7.0
+# Copy-in bootstrap: copies the complete, verified Plugin Autopilot engine into any repository.
 # From that point on, the kit is yours — no external dependency at runtime.
 # Edit the config, rename things, delete a skill you don't need.
 #

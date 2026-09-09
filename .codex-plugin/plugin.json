@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-codex-plugin-autopilot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Convert agentic repositories into focused ChatGPT/Codex plugins, add host workspace operations, execute available Python verification, then validate, package, and prepare them for submission",
   "author": {
     "name": "Mamdouh Aboammar",

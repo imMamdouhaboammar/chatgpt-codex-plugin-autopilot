@@ -3,8 +3,9 @@
 [![CI](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/actions/workflows/ci.yml/badge.svg)](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/imMamdouhaboammar/chatgpt-codex-plugin-autopilot?label=release&color=4F6FFF)](https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot/releases/latest)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Plugin%20Autopilot-blue?logo=github)](https://github.com/marketplace/actions/chatgpt-codex-plugin-autopilot)
 [![Skills: 9](https://img.shields.io/badge/skills-9-blueviolet)](./skills/)
-[![Tests: 92](https://img.shields.io/badge/tests-92%20passing-brightgreen)](./tests/)
+[![Tests: 96](https://img.shields.io/badge/tests-96%20passing-brightgreen)](./tests/)
 [![Author: Mamdouh Aboammar](https://img.shields.io/badge/author-Mamdouh%20Aboammar-orange)](https://github.com/imMamdouhaboammar)
 
 > **Self-hosting Plugin autopilot** — convert agentic repositories into focused, validated, deterministically packaged ChatGPT/Codex Plugins.
@@ -52,6 +53,60 @@ python3 scripts/build_release.py --out-dir dist
 # Run the full test suite
 python3 -m unittest discover -s tests -v
 ```
+
+## GitHub Action (Marketplace)
+
+Integrate Plugin Autopilot directly into any agentic repository or CI/CD workflow with zero setup.
+
+```yaml
+# .github/workflows/plugin.yml
+name: ChatGPT & Codex Plugin Autopilot
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  autopilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Plugin Autopilot
+        uses: imMamdouhaboammar/chatgpt-codex-plugin-autopilot@v1
+        with:
+          path: '.'
+          action: 'auto' # 'auto' | 'analyze' | 'validate' | 'package' | 'build-directory-pack'
+          output-dir: 'dist'
+          fail-on-error: 'true'
+          summary: 'true'
+
+      - name: Attach Plugin Release Artifact
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.zip
+            dist/SHA256SUMS
+```
+
+### Action Modes
+
+| Mode | Purpose | Description |
+| :--- | :--- | :--- |
+| `auto` *(default)* | Adaptive Execution | Detects if `.codex-plugin/plugin.json` exists; validates and packages if present, otherwise analyzes repository workflows. |
+| `analyze` | Repo Discovery | Scans `AGENTS.md`, Skills, playbooks, and commands to produce actionable plugin architecture recommendations. |
+| `validate` | Preflight Linting | Runs full security and contract verification (manifests, semver, SVG luminance, archive safety). |
+| `package` | Deterministic Release | Compiles a clean, byte-for-byte deterministic ZIP archive with computed SHA-256 checksums. |
+| `build-directory-pack` | Submission Assets | Prepares listing metadata, icons, and reviewer packets for ChatGPT/Codex Plugin Directory submission. |
+
+### Inputs & Outputs
+
+- **Inputs:** `path` (default: `.`), `action` (default: `auto`), `output-dir` (default: `dist`), `fail-on-error` (default: `true`), `summary` (default: `true`).
+- **Outputs:** `ok` (`true`/`false`), `architecture` (`skills-only` \| `mcp-backed` \| `hybrid`), `skills-count`, `plugin-path`, `sha256`.
 
 ## The 0.6 flow
 

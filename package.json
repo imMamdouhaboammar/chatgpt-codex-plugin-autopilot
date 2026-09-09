@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-codex-plugin-autopilot",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Self-hosting ChatGPT/Codex Plugin autopilot — find agentic workflows, compile Skills, package, validate, and release verified plugins",
   "author": {
     "name": "Mamdouh Aboammar",
@@ -27,7 +27,8 @@
     "gemini-cli",
     "cursor",
     "bun",
-    "python"
+    "github-action",
+    "github-marketplace"
   ],
   "bin": {
     "chatgpt-codex-plugin-autopilot": "./install.sh"
@@ -39,6 +40,7 @@
     "install-skill": "bash install.sh"
   },
   "files": [
+    "action.yml",
     "skills/",
     "assets/",
     "scripts/",
