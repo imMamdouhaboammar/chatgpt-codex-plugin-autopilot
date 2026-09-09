@@ -1493,12 +1493,14 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         elif any(not isinstance(item, str) or not item or len(item) > 120 or "\n" in item or "\r" in item for item in capabilities):
             _error(errors, "each interface.capabilities item must be a non-empty one-line string <=120 characters")
 
+    starter_prompt_count = 0
     prompts = interface.get("defaultPrompt")
     if prompts is not None:
         prompt_list = [prompts] if isinstance(prompts, str) else prompts if isinstance(prompts, list) else None
         if prompt_list is None:
             _error(errors, "interface.defaultPrompt must be a string or list of strings")
         else:
+            starter_prompt_count = len(prompt_list)
             if len(prompt_list) > 3:
                 _error(errors, "interface.defaultPrompt must contain at most 3 prompts")
             normalized_prompts: set[str] = set()
@@ -1525,13 +1527,39 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
 
     screenshots = interface.get("screenshots")
     if screenshots is not None:
-        if not isinstance(screenshots, list):
+        if not has_mcp:
+            _error(errors, "screenshot_configuration_excluded: Skills-only ZIP uploads must not include interface.screenshots")
+        elif not isinstance(screenshots, list):
             _error(errors, "interface.screenshots must be a list of relative asset paths")
         else:
+            _warning(warnings, "interface.screenshots require MCP custom UI; local preflight cannot prove custom UI exists")
+            if starter_prompt_count == 0 or len(screenshots) != starter_prompt_count:
+                _error(errors, "interface.screenshots must include exactly one PNG or JPEG for every starter prompt")
             for index, screenshot in enumerate(screenshots):
                 candidate = _relative_file_path(root, f"interface.screenshots[{index}]", screenshot, errors, require_dot_prefix=True)
-                if candidate is not None:
-                    _verify_regular_package_file(root, candidate, f"interface.screenshots[{index}] asset", errors)
+                if candidate is None:
+                    continue
+                suffix = candidate.suffix.lower()
+                if suffix not in {".png", ".jpg", ".jpeg"}:
+                    _error(errors, f"interface.screenshots[{index}] must be a PNG or JPEG image")
+                    continue
+                result = _read_regular_package_bytes(
+                    root,
+                    candidate,
+                    f"interface.screenshots[{index}] asset",
+                    errors,
+                    max_bytes=MAX_IMAGE,
+                )
+                if result is None:
+                    continue
+                data, _ = result
+                try:
+                    width, height = _image_size(suffix, data)
+                except Exception as exc:
+                    _error(errors, f"interface.screenshots[{index}] image unreadable: {screenshot}: {exc}")
+                    continue
+                if width != 706 or height < 400 or height > 860:
+                    _error(errors, f"interface.screenshots[{index}] must be 706px wide and 400-860px tall")
 
     files, entry_count, total_bytes = _walk(root, errors, exclusions)
     if not exclusions:
