@@ -1,6 +1,6 @@
 # Official OpenAI Plugin Contract Baseline
 
-Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes, archive member path limits, and duplicate app reference warning severity were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
+Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes, archive member path limits, duplicate app reference warning severity, and dependencies.tools contract were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
 
 - https://developers.openai.com/plugins/concepts/plugins
 - https://developers.openai.com/plugins/concepts/skills
@@ -60,7 +60,14 @@ When the file is present, local preflight parses it as fail-closed YAML (no tags
 - `policy` is optional and supports `products` plus `allow_implicit_invocation`
 - `products` may contain `CHAT`, `CODEX`, or both
 - `allow_implicit_invocation` is boolean
-- `dependencies` is optional and currently supports `tools`
+- `dependencies` is optional and currently supports `tools` (authoritative contract verified 2026-09):
+  - `dependencies` must be a YAML mapping; no top-level keys other than `tools` are supported
+  - `dependencies.tools` must be a YAML list of tool configuration objects
+  - each item requires `type` (non-empty string); currently supported tool types include `mcp`
+  - when `type` is `mcp`, `value` is required (non-empty string specifying the MCP server identifier)
+  - optional tool fields: `description` (string), `transport` (e.g. `streamable_http`, `sse`), and `url` (HTTPS URL)
+  - **Deterministic local checks vs. external eligibility:** Local preflight validates schema types, required keys, non-empty identifiers, and HTTPS transport URLs. Live server reachability, OAuth authorization, domain ownership verification, and directory eligibility remain external portal checks.
+  - unrecognized tool keys are retained with a warning for forward compatibility
 
 Do not put Skill interface settings in `metadata` inside `SKILL.md`; the documented interface location is `agents/openai.yaml`.
 
