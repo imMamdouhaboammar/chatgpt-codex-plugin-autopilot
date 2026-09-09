@@ -33,9 +33,14 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("cmp", text)
         self.assertIn("gh release create", text)
         self.assertIn("SHA256SUMS", text)
+        self.assertIn("submission/reviewer-packet.json", text)
         self.assertIn("(cd dist-a && sha256sum -c SHA256SUMS)", text)
         self.assertRegex(text, r"actions/checkout@[0-9a-f]{40}")
         self.assertNotRegex(text, r"(?i)npm\s+publish|twine\s+upload")
+
+    def test_obsolete_version_specific_release_workflow_retired(self):
+        self.assertFalse((ROOT / ".github/workflows/publish-v0.3.0.yml").exists())
+
 
 if __name__ == "__main__":
     unittest.main()

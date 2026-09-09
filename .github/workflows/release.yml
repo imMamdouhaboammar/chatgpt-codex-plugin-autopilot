@@ -54,6 +54,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             dist-a/chatgpt-codex-plugin-autopilot-*.zip \
             dist-a/SHA256SUMS \
+            submission/reviewer-packet.json \
             --verify-tag \
             --generate-notes \
             --title "$GITHUB_REF_NAME"
