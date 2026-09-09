@@ -288,7 +288,13 @@ def _read_regular_package_bytes(
         _error(errors, f"{label} exceeds safe read limit: {rel}")
         return None
     try:
-        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+        handle = os.fdopen(descriptor, "rb", closefd=True)
+    except (OSError, ValueError):
+        os.close(descriptor)
+        _error(errors, f"{label} could not be read after verification: {rel}")
+        return None
+    try:
+        with handle:
             data = handle.read(max_bytes + 1)
     except OSError:
         _error(errors, f"{label} could not be read after verification: {rel}")
@@ -654,10 +660,7 @@ def _validate_image(root: Path, field: str, value: object, errors: list[str]) ->
     result = _read_regular_package_bytes(root, candidate, f"interface.{field} asset", errors, max_bytes=MAX_IMAGE)
     if result is None:
         return
-    data, member = result
-    if member.st_size > MAX_IMAGE:
-        _error(errors, f"interface.{field} image exceeds 5 MiB: {value}")
-        return
+    data, _ = result
     try:
         width, height = _image_size(suffix, data)
     except Exception as exc:
