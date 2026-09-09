@@ -139,6 +139,7 @@ Current public package checks include limits for archive entries, extracted size
 - transient Python bytecode and cache directories
 - `.DS_Store`, `Thumbs.db`, AppleDouble files
 - secret-shaped configuration files
+- member names containing `\`
 - normalization/case path collisions
 - accidental absolute local user paths
 - explicitly excluded internal capabilities

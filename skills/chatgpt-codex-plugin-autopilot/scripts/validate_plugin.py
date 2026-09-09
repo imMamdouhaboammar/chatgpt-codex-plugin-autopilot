@@ -1221,10 +1221,14 @@ def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Pa
                 _error(errors, f"symlink is not allowed in public plugin: {path.relative_to(root)}")
                 dirs.remove(name)
                 continue
+            if "\\" in name:
+                _error(errors, f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {path.relative_to(root).as_posix()}")
             directories.add(path)
         for name in names:
             path = current_path / name
             rel = path.relative_to(root).as_posix()
+            if "\\" in rel:
+                _error(errors, f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {rel}")
             if rel != rel.strip():
                 _error(errors, f"archive member path has outer whitespace: {rel!r}")
             segments = rel.split("/")
