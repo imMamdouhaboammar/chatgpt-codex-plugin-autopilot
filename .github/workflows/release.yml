@@ -103,6 +103,7 @@ jobs:
             dist-release/chatgpt-codex-plugin-autopilot-*.zip \
             dist-release/SHA256SUMS \
             dist-release/reviewer-packet.json \
+            --repo "$GITHUB_REPOSITORY" \
             --verify-tag \
             --generate-notes \
             --title "$GITHUB_REF_NAME"
@@ -114,5 +115,5 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist-download
-          gh release download "$GITHUB_REF_NAME" --dir dist-download
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --dir dist-download
           cd dist-download && sha256sum -c SHA256SUMS

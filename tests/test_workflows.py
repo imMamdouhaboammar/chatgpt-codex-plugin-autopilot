@@ -54,9 +54,8 @@ class WorkflowTests(unittest.TestCase):
         )
         self.assertRegex(text, r"actions/upload-artifact@[0-9a-f]{40}")
         self.assertRegex(text, r"actions/download-artifact@[0-9a-f]{40}")
-        self.assertIn("gh release download \"$GITHUB_REF_NAME\" --dir dist-download", text)
+        self.assertIn("gh release download \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --dir dist-download", text)
 
 
 if __name__ == "__main__":
     unittest.main()
-
