@@ -768,7 +768,7 @@ def _parse_flow_seq(text: str, index: int) -> tuple[list[object], int]:
         if text[index] == "]":
             return items, index + 1
         if text[index] == ",":
-            if expect_value and items:
+            if expect_value:
                 raise _YamlError("malformed", "empty sequence item")
             expect_value = True
             index += 1
@@ -793,6 +793,8 @@ def _parse_flow_map(text: str, index: int) -> tuple[dict[str, object], int]:
         if text[index] == "}":
             return result, index + 1
         if text[index] == ",":
+            if expect_pair:
+                raise _YamlError("malformed", "empty mapping pair")
             expect_pair = True
             index += 1
             continue

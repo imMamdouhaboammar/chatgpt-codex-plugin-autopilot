@@ -134,6 +134,29 @@ class SkillFrontmatterYamlTests(unittest.TestCase):
             self.assertEqual(proc.returncode, 0, report)
             self.assertEqual(report["skills"], ["multiline-worker"])
 
+    def test_rejects_leading_comma_in_flow_collections(self):
+        cases = (
+            "metadata: [ , extra]",
+            "metadata: {, extra: 1}",
+        )
+        for extra in cases:
+            with self.subTest(extra=extra), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "plugin"
+                write_fixture(
+                    root,
+                    "name: worker\n"
+                    "description: Use when validating malformed flow collections.\n"
+                    f"{extra}",
+                )
+
+                proc, report = validate(root)
+
+                self.assertNotEqual(proc.returncode, 0, report)
+                self.assertTrue(
+                    any("frontmatter" in error.lower() and "malformed" in error.lower() for error in report["errors"]),
+                    report,
+                )
+
     def test_rejects_explicit_yaml_tags(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
