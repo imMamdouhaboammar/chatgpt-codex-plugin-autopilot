@@ -20,6 +20,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertRegex(text, r"actions/upload-artifact@[0-9a-f]{40}")
         self.assertIn("contents: read", text)
         self.assertIn("cd dist && sha256sum -c SHA256SUMS", text)
+        self.assertIn("uses: paladini/harness-score@v1.6.5", text)
         self.assertNotRegex(text, r"(?i)npm\s+publish|twine\s+upload")
 
     def test_release_is_tag_only_and_attaches_verified_plugin_assets(self):

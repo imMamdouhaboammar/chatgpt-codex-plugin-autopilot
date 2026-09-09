@@ -4,3 +4,8 @@ __pycache__/
 dist/
 dist-a/
 dist-b/
+.env
+.env.*
+harness-badge.svg
+harness-report.json
+harness-report.md
