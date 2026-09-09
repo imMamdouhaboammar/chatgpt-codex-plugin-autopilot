@@ -1168,14 +1168,14 @@ def _validate_skill_agent_metadata(plugin_root: Path, skill_dir: Path, errors: l
         )
 
 
-def _validate_app_manifest(data: dict, errors: list[str]) -> None:
+def _validate_app_manifest(data: dict, errors: list[str], warnings: list[str] | None = None) -> None:
     if not data:
         return
     apps = data.get("apps")
     if not isinstance(apps, dict):
         _error(errors, ".app.json apps is required and must be an object")
         return
-    seen_ids: set[str] = set()
+    seen_ids: dict[str, str] = {}
     for alias, entry in apps.items():
         if not isinstance(entry, dict):
             _error(errors, f".app.json app entry must be an object: {alias}")
@@ -1186,9 +1186,14 @@ def _validate_app_manifest(data: dict, errors: list[str]) -> None:
         elif not APP_ID.fullmatch(app_id):
             _error(errors, f".app.json app id has unsupported format: {alias}: {app_id}")
         elif app_id in seen_ids:
-            _error(errors, f".app.json duplicate app id: {app_id}")
+            if warnings is not None:
+                _warning(
+                    warnings,
+                    f"duplicate_app_reference: .app.json duplicate app id {app_id} in {alias} "
+                    f"(already referenced by {seen_ids[app_id]}); treated as one app",
+                )
         else:
-            seen_ids.add(app_id)
+            seen_ids[app_id] = alias
         for field in ("optional", "required"):
             if field in entry and not isinstance(entry[field], bool):
                 _error(errors, f".app.json {alias}.{field} must be true or false")
@@ -1355,7 +1360,7 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         )
     if apps_declared:
         app_data = _load_json_package_file(root, root / ".app.json", errors, ".app.json")
-        _validate_app_manifest(app_data, errors)
+        _validate_app_manifest(app_data, errors, warnings)
     elif "apps" not in manifest and (root / ".app.json").exists():
         _error(
             errors,

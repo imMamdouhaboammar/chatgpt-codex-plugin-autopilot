@@ -1,6 +1,6 @@
 # Official OpenAI Plugin Contract Baseline
 
-Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes and archive member path limits were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
+Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes, archive member path limits, and duplicate app reference warning severity were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
 
 - https://developers.openai.com/plugins/concepts/plugins
 - https://developers.openai.com/plugins/concepts/skills
@@ -110,6 +110,8 @@ Manifest branding assets should use `./`-prefixed paths. Skills-only packages mu
 An undeclared root `.app.json` is ignored by the importer and must not change architecture classification. Skills-only public preflight still fails if that file would remain in the ZIP (`app_configuration_excluded`).
 
 For local/workspace packages, `.app.json` uses a top-level `apps` object. Each alias maps to an object with a required string `id`; optional `optional` and `required` values must be booleans when supplied. The official submission error reference defines the current accepted ID families. The package/build documentation also documents current `plugin_asdk_app...` developer-mode IDs, so re-check both pages when validating a newly generated mapping.
+
+If multiple aliases within `.app.json` reference the same valid app ID, the platform treats them as references to one app and issues a package warning (`duplicate_app_reference`). Local preflight emits a warning identifying the duplicate aliases rather than failing validation, while continuing to enforce schema rules on each declared alias.
 
 A public skills-only submission does not publish a reference to an existing ChatGPT app. An MCP-backed public submission uses the MCP submission route and submits the MCP server integration directly.
 

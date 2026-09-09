@@ -2,7 +2,7 @@
 
 Treat uploader and review messages as evidence. Map each failure to the source that produced it, fix that source, rebuild, and rerun the complete gate. Do not patch only the final ZIP when a generator or installer will recreate the problem.
 
-This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13. Skill YAML frontmatter local preflight and archive member path limits were re-checked against that reference on 2026-09-09.
+This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13. Skill YAML frontmatter local preflight, archive member path limits, and duplicate app reference warning severity were re-checked against that reference on 2026-09-09.
 
 ## Package root and `.codex-plugin/`
 
@@ -123,6 +123,8 @@ For declared app mappings, validate:
 - every entry has a string `id`
 - IDs use a currently documented eligible family
 - optional `optional` / `required` fields are booleans
+
+Duplicate app references (`duplicate_app_reference`): If multiple aliases reference the same valid app ID within `.app.json`, the platform normalizes them into one effective app connection and issues a package warning rather than a blocking error. Local preflight emits a `duplicate_app_reference` warning identifying the duplicate aliases while maintaining full validation of each entry's schema.
 
 The public submission portal does not publish a reference to an existing ChatGPT app as a substitute for MCP review. Skills-only and MCP-backed public submissions follow separate paths.
 
