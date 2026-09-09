@@ -38,6 +38,8 @@ def _collect(root: Path) -> tuple[list[str], list[str]]:
             if path.is_symlink() or not path.is_file():
                 raise ValueError(f"unsupported package member: {path.relative_to(root)}")
             rel = path.relative_to(root).as_posix()
+            if "\\" in rel:
+                raise ValueError(f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {rel}")
             files.append(rel)
             parts = rel.split("/")[:-1]
             for index in range(1, len(parts) + 1):
