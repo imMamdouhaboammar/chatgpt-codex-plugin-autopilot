@@ -250,6 +250,7 @@ Repository-native quality, security, domain acceptance, and smoke checks remain 
 - a path such as `./assets/../assets/icon.svg` is unsafe even if it resolves inside the package
 - extra files inside `.codex-plugin/` are misplaced
 - undeclared `.app.json` / `.mcp.json` do not activate app/MCP capability and cannot remain in a Skills-only ZIP
+- Skills-only packages cannot include `interface.screenshots`; MCP screenshots need one PNG/JPEG per starter prompt at 706x400–860
 - Skill metadata `name` and directory slug are separate contracts
 - `agents/openai.yaml` must be validated when bundled
 - host-native read/write/search/grep/shell/patch/Python capabilities must not be represented as invented manifest dependencies

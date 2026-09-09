@@ -1,8 +1,10 @@
 import importlib.util
 import json
+import struct
 import subprocess
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 from unittest import mock
 
@@ -13,6 +15,15 @@ PACKAGER = ROOT / "skills/chatgpt-codex-plugin-autopilot/scripts/package_plugin.
 
 def square_svg() -> str:
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64"/></svg>\n'
+
+
+def rgb_png(width: int, height: int) -> bytes:
+    def chunk(tag: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+
+    raw = b"".join(b"\x00" + (b"\xff\x00\x00" * width) for _ in range(height))
+    ihdr = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", ihdr) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
 
 
 def base_manifest() -> dict:
@@ -175,6 +186,63 @@ class ValidatorRegressionTests(unittest.TestCase):
             proc, report = validate(root)
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any("agents/openai.yaml" in error for error in report["errors"]), report)
+
+    def test_rejects_screenshots_on_skills_only_packages(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["interface"]["screenshots"] = ["./assets/icon.svg"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertEqual(report["architecture"], "skills-only")
+            self.assertTrue(
+                any("screenshot_configuration_excluded" in error for error in report["errors"]),
+                report,
+            )
+
+    def test_rejects_mcp_screenshots_with_wrong_count_format_or_dimensions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["mcpServers"] = "./.mcp.json"
+            manifest["interface"]["defaultPrompt"] = ["Use the fixture.", "Use it again."]
+            manifest["interface"]["screenshots"] = ["./assets/shot.png"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            (root / ".mcp.json").write_text(
+                json.dumps({"mcp_servers": {"demo": {"url": "https://example.com/mcp"}}}),
+                encoding="utf-8",
+            )
+            (root / "assets" / "shot.png").write_bytes(rgb_png(64, 64))
+            proc, report = validate(root)
+            self.assertNotEqual(proc.returncode, 0, report)
+            joined = "\n".join(report["errors"]).lower()
+            self.assertIn("screenshot", joined)
+            self.assertIn("starter prompt", joined)
+
+    def test_accepts_mcp_screenshots_matching_prompt_count_and_dimensions(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["mcpServers"] = "./.mcp.json"
+            manifest["interface"]["defaultPrompt"] = ["Use the fixture."]
+            manifest["interface"]["screenshots"] = ["./assets/shot.png"]
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            (root / ".mcp.json").write_text(
+                json.dumps({"mcp_servers": {"demo": {"url": "https://example.com/mcp"}}}),
+                encoding="utf-8",
+            )
+            (root / "assets" / "shot.png").write_bytes(rgb_png(706, 400))
+            proc, report = validate(root)
+            self.assertEqual(proc.returncode, 0, report)
+            self.assertEqual(report["architecture"], "hybrid")
+            self.assertTrue(any("custom UI" in warning for warning in report["warnings"]), report)
 
     def test_rejects_malformed_openai_agent_yaml(self):
         with tempfile.TemporaryDirectory() as temp:

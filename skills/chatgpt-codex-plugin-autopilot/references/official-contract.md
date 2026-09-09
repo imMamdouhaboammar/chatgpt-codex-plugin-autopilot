@@ -97,7 +97,7 @@ Declared asset paths must:
 - contain no absolute path, drive prefix, or `..` traversal segment
 - resolve to a real package file
 
-Manifest branding assets should use `./`-prefixed paths. Screenshots are package assets too and should be validated as declared paths.
+Manifest branding assets should use `./`-prefixed paths. Skills-only packages must not include `interface.screenshots` (`screenshot_configuration_excluded`). MCP-backed screenshots are allowed only with custom UI; local preflight cannot prove custom UI, and when screenshots are present it requires one PNG or JPEG per starter prompt at exactly 706px wide and 400–860px tall.
 
 ## App references
 
