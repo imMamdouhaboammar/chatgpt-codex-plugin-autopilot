@@ -5,15 +5,19 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
+permissions: {}
 
 jobs:
-  release:
+  verify:
+    name: Verify Release Candidate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
+      - name: Checkout repository and history
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
 
       - name: Verify tag matches manifest version
         shell: bash
@@ -22,8 +26,18 @@ jobs:
           version="$(python3 -c 'import json; print(json.load(open(".codex-plugin/plugin.json"))["version"])')"
           test "$GITHUB_REF_NAME" = "v$version"
 
+      - name: Verify release commit provenance on main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main:refs/remotes/origin/main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+
       - name: Unit tests
         run: python3 -m unittest discover -s tests -v
+
+      - name: Directory listing pack
+        run: python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json
 
       - name: Self-check
         run: python3 scripts/self_check.py
@@ -47,14 +61,58 @@ jobs:
           unzip -t "${a[0]}"
           unzip -Z1 "${a[0]}"
 
+      - name: Stage verified release assets
+        run: |
+          mkdir -p verified-assets
+          cp dist-a/chatgpt-codex-plugin-autopilot-*.zip verified-assets/
+          cp dist-a/SHA256SUMS verified-assets/
+          cp submission/reviewer-packet.json verified-assets/
+
+      - name: Upload verified release assets
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: verified-release-assets
+          path: verified-assets/
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified release assets
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: verified-release-assets
+          path: dist-release
+
+      - name: Verify release asset checksums before publication
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist-release && sha256sum -c SHA256SUMS
+
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" \
-            dist-a/chatgpt-codex-plugin-autopilot-*.zip \
-            dist-a/SHA256SUMS \
-            submission/reviewer-packet.json \
+            dist-release/chatgpt-codex-plugin-autopilot-*.zip \
+            dist-release/SHA256SUMS \
+            dist-release/reviewer-packet.json \
             --verify-tag \
             --generate-notes \
             --title "$GITHUB_REF_NAME"
+
+      - name: Post-publish download and checksum verification
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist-download
+          gh release download "$GITHUB_REF_NAME" --dir dist-download
+          cd dist-download && sha256sum -c SHA256SUMS
