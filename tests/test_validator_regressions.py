@@ -439,6 +439,69 @@ class ValidatorRegressionTests(unittest.TestCase):
                 proc, report = validate(root)
                 self.assertEqual(proc.returncode, 0, report)
 
+    def test_validates_skill_agent_dependencies_tools_positive_and_negative(self):
+        # Positive case with valid MCP tool dependency and forward-compatibility warning
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            agents = root / "skills" / "worker" / "agents"
+            agents.mkdir()
+            (agents / "openai.yaml").write_text(
+                "interface:\n"
+                "  display_name: Valid Tool Dependency\n"
+                "  short_description: Validates tool dependencies\n"
+                "dependencies:\n"
+                "  tools:\n"
+                "    - type: mcp\n"
+                "      value: demoMcpServer\n"
+                "      description: Documentation MCP server\n"
+                "      transport: streamable_http\n"
+                "      url: https://example.com/mcp\n"
+                "      experimental_flag: true\n",
+                encoding="utf-8",
+            )
+            proc, report = validate(root)
+            self.assertEqual(proc.returncode, 0, report)
+            self.assertTrue(any("experimental_flag" in warning for warning in report["warnings"]), report)
+
+        # Negative cases
+        negative_cases = (
+            (
+                "interface:\n  display_name: Neg\n  short_description: Neg\ndependencies:\n  tools: not-a-list\n",
+                "skill_agent_tools_wrong_type",
+            ),
+            (
+                "interface:\n  display_name: Neg\n  short_description: Neg\ndependencies:\n  tools:\n    - not-a-mapping\n",
+                "skill_agent_tool_entry_wrong_type",
+            ),
+            (
+                "interface:\n  display_name: Neg\n  short_description: Neg\ndependencies:\n  tools:\n    - value: server\n",
+                "skill_agent_tool_type_missing",
+            ),
+            (
+                "interface:\n  display_name: Neg\n  short_description: Neg\ndependencies:\n  tools:\n    - type: mcp\n",
+                "skill_agent_tool_value_missing",
+            ),
+            (
+                "interface:\n  display_name: Neg\n  short_description: Neg\ndependencies:\n  unsupported_key: true\n",
+                "skill_agent_dependency_unsupported",
+            ),
+            (
+                "interface:\n  display_name: Neg\n  short_description: Neg\ndependencies:\n  tools:\n    - type: mcp\n      value: srv\n      url: http://insecure.example.com/mcp\n",
+                "skill_agent_tool_url_insecure",
+            ),
+        )
+        for document, expected_error in negative_cases:
+            with self.subTest(expected=expected_error), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp) / "plugin"
+                write_fixture(root)
+                agents = root / "skills" / "worker" / "agents"
+                agents.mkdir()
+                (agents / "openai.yaml").write_text(document, encoding="utf-8")
+                proc, report = validate(root)
+                self.assertNotEqual(proc.returncode, 0, report)
+                self.assertTrue(any(expected_error in error for error in report["errors"]), report)
+
     def test_rejects_invalid_declared_app_mapping(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"

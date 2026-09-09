@@ -982,6 +982,32 @@ class _RestrictedYamlParser:
                     items.append(self.parse_node(indent + 1))
                 else:
                     items.append(None)
+            elif _split_mapping_line(rest) is not None:
+                pair = _split_mapping_line(rest)
+                assert pair is not None
+                key, val_rest = pair
+                m: dict[str, object] = {}
+                val_ind = _BLOCK_INDICATOR.fullmatch(val_rest.strip())
+                if val_ind:
+                    m[key] = self.parse_block_scalar(val_ind.group(1), indent)
+                elif val_rest.strip() == "" or val_rest.strip().startswith("#"):
+                    self.skip_blank_comments()
+                    if self.i < len(self.lines) and self.current_indent() > indent:
+                        m[key] = self.parse_node(indent + 1)
+                    else:
+                        m[key] = None
+                else:
+                    m[key] = _parse_value_token(val_rest)
+                self.skip_blank_comments()
+                if self.i < len(self.lines):
+                    next_indent = self.current_indent()
+                    if next_indent > indent:
+                        rest_map = self.parse_block_map(next_indent)
+                        for k, v in rest_map.items():
+                            if k in m:
+                                raise _YamlError("malformed", f"duplicate key {k}")
+                            m[k] = v
+                items.append(m)
             else:
                 items.append(_parse_value_token(rest))
         return items
@@ -1158,7 +1184,43 @@ def _validate_skill_agent_metadata(plugin_root: Path, skill_dir: Path, errors: l
         else:
             unsupported = sorted(set(dependencies) - {"tools"})
             for key in unsupported:
-                _error(errors, f"{rel}: only dependencies.tools is supported; found {key}")
+                _error(errors, f"skill_agent_dependency_unsupported: {rel}: only dependencies.tools is supported in agents/openai.yaml; found {key}")
+            if "tools" in dependencies:
+                tools = dependencies["tools"]
+                if not isinstance(tools, list):
+                    _error(errors, f"skill_agent_tools_wrong_type: {rel}: dependencies.tools must be a YAML list")
+                else:
+                    for idx, tool in enumerate(tools):
+                        if not isinstance(tool, dict):
+                            _error(errors, f"skill_agent_tool_entry_wrong_type: {rel}: dependencies.tools[{idx}] must be a YAML mapping")
+                            continue
+                        tool_type = tool.get("type")
+                        if not isinstance(tool_type, str) or not tool_type.strip():
+                            _error(errors, f"skill_agent_tool_type_missing: {rel}: dependencies.tools[{idx}] requires a non-empty string 'type'")
+                            continue
+                        if tool_type == "mcp":
+                            val = tool.get("value")
+                            if not isinstance(val, str) or not val.strip():
+                                _error(errors, f"skill_agent_tool_value_missing: {rel}: dependencies.tools[{idx}] MCP entry requires a non-empty string 'value'")
+                            if "description" in tool and not isinstance(tool["description"], str):
+                                _error(errors, f"{rel}: dependencies.tools[{idx}].description must be a string")
+                            if "transport" in tool and not isinstance(tool["transport"], str):
+                                _error(errors, f"{rel}: dependencies.tools[{idx}].transport must be a string")
+                            if "url" in tool:
+                                url_val = tool["url"]
+                                if not isinstance(url_val, str) or not url_val.strip():
+                                    _error(errors, f"{rel}: dependencies.tools[{idx}].url must be a non-empty string")
+                                elif url_val.startswith("http://") and not (url_val.startswith("http://localhost") or url_val.startswith("http://127.0.0.1")):
+                                    _error(errors, f"skill_agent_tool_url_insecure: {rel}: dependencies.tools[{idx}].url remote endpoint must use HTTPS")
+                                elif not url_val.startswith("https://") and not (url_val.startswith("http://localhost") or url_val.startswith("http://127.0.0.1")):
+                                    _error(errors, f"skill_agent_tool_url_invalid: {rel}: dependencies.tools[{idx}].url must be an HTTP/HTTPS URL")
+                            extra_keys = sorted(set(tool) - {"type", "value", "description", "transport", "url"})
+                            if extra_keys:
+                                _warning(warnings, f"{rel}: dependencies.tools[{idx}] contains unrecognized fields retained for forward compatibility: {', '.join(extra_keys)}")
+                        else:
+                            extra_keys = sorted(set(tool) - {"type", "value", "description"})
+                            if extra_keys:
+                                _warning(warnings, f"{rel}: dependencies.tools[{idx}] contains unrecognized fields retained for forward compatibility: {', '.join(extra_keys)}")
 
     unknown = sorted(set(parsed) - {"interface", "policy", "dependencies"})
     if unknown:
