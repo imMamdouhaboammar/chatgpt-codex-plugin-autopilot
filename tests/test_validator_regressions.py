@@ -1,8 +1,10 @@
+import importlib.util
 import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py"
@@ -56,6 +58,22 @@ def validate(root: Path) -> tuple[subprocess.CompletedProcess[str], dict]:
     )
     report = json.loads(proc.stdout)
     return proc, report
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("plugin_autopilot_validator", VALIDATOR)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("validator module could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def assert_regular_file_error(test: unittest.TestCase, report: dict, declared_path: str) -> None:
+    test.assertTrue(
+        any(declared_path in error and "regular file" in error.lower() for error in report["errors"]),
+        report,
+    )
 
 
 class ValidatorRegressionTests(unittest.TestCase):
@@ -145,6 +163,209 @@ class ValidatorRegressionTests(unittest.TestCase):
             proc, report = validate(root)
             self.assertNotEqual(proc.returncode, 0, report)
             self.assertTrue(any(".mcp.json" in error for error in report["errors"]), report)
+
+    def test_rejects_symlinked_manifest_before_parsing_external_target(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            target = Path(temp) / "outside-manifest.json"
+            target.write_text('{"external-secret-marker":', encoding="utf-8")
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest_path.unlink()
+            manifest_path.symlink_to(target)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, ".codex-plugin/plugin.json")
+            self.assertFalse(any("malformed" in error.lower() for error in report["errors"]), report)
+            self.assertNotIn("external-secret-marker", json.dumps(report))
+            self.assertNotIn(str(target), json.dumps(report))
+
+    def test_rejects_internal_symlinked_skill_before_parsing_target(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            skill_dir = root / "skills" / "worker"
+            target = skill_dir / "REAL-SKILL.md"
+            target.write_text(
+                "---\nname: leaked-symlink-target\ndescription: Must never be parsed through SKILL.md.\n---\n\nDo not parse.\n",
+                encoding="utf-8",
+            )
+            definition = skill_dir / "SKILL.md"
+            definition.unlink()
+            definition.symlink_to(target.name)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, "skills/worker/SKILL.md")
+            self.assertNotIn("leaked-symlink-target", report["skills"])
+
+    def test_rejects_symlinked_agent_metadata_before_yaml_inspection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            agents = root / "skills" / "worker" / "agents"
+            agents.mkdir()
+            target = agents / "target.yaml"
+            target.write_text(
+                "interface:\n"
+                "  display_name: Fixture\n"
+                "  short_description: Fixture\n"
+                "policy:\n"
+                "  allow_implicit_invocation: sometimes\n",
+                encoding="utf-8",
+            )
+            metadata = agents / "openai.yaml"
+            metadata.symlink_to(target.name)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, "skills/worker/agents/openai.yaml")
+            self.assertFalse(any("interface mapping is required" in error for error in report["errors"]), report)
+            self.assertFalse(any("allow_implicit_invocation must be" in error for error in report["errors"]), report)
+
+    def test_rejects_symlinked_declared_app_manifest_before_json_parsing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["apps"] = "./.app.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            target = Path(temp) / "outside-app.json"
+            target.write_text('{"external-app-marker":', encoding="utf-8")
+            (root / ".app.json").symlink_to(target)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, ".app.json")
+            self.assertFalse(any("unreadable or malformed" in error for error in report["errors"]), report)
+            self.assertNotIn("external-app-marker", json.dumps(report))
+            self.assertNotIn(str(target), json.dumps(report))
+
+    def test_rejects_symlinked_declared_mcp_manifest_before_json_parsing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["mcpServers"] = "./.mcp.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            target = Path(temp) / "outside-mcp.json"
+            target.write_text('{"external-mcp-marker":', encoding="utf-8")
+            (root / ".mcp.json").symlink_to(target)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, ".mcp.json")
+            self.assertFalse(any("unreadable or malformed" in error for error in report["errors"]), report)
+            self.assertNotIn("external-mcp-marker", json.dumps(report))
+            self.assertNotIn(str(target), json.dumps(report))
+
+    def test_rejects_symlinked_brand_asset_before_image_inspection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            target = root / "assets" / "target.svg"
+            target.write_text("<svg", encoding="utf-8")
+            icon = root / "assets" / "icon.svg"
+            icon.unlink()
+            icon.symlink_to(target.name)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, "assets/icon.svg")
+            self.assertFalse(any("image unreadable" in error.lower() for error in report["errors"]), report)
+
+    def test_rejects_symlinked_hook_path_after_lexical_path_hardening(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["hooks"] = "./hooks.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            target = Path(temp) / "outside-hooks.json"
+            target.write_text("{}\n", encoding="utf-8")
+            (root / "hooks.json").symlink_to(target)
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            assert_regular_file_error(self, report, "hooks.json")
+            self.assertNotIn(str(target), json.dumps(report))
+
+    def test_control_character_asset_path_returns_json_error_instead_of_crashing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["interface"]["logo"] = "./assets/icon\u0000.svg"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertTrue(any("control character" in error for error in report["errors"]), report)
+
+    def test_rejects_skills_path_traversal_before_outside_directory_inspection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            outside = Path(temp) / "outside"
+            outside.mkdir()
+            (outside / "escape").mkdir()
+            (outside / "escape" / "SKILL.md").write_text(
+                "---\nname: outside-skill-marker\ndescription: Must not be inspected.\n---\n\nOutside.\n",
+                encoding="utf-8",
+            )
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["skills"] = "./skills/../../outside"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertTrue(any("manifest skills path" in error for error in report["errors"]), report)
+            self.assertNotIn("outside-skill-marker", report["skills"])
+
+    def test_verified_reader_rejects_file_replaced_by_regular_file_before_open(self):
+        validator = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            root.mkdir()
+            candidate = root / "metadata.json"
+            candidate.write_text('{"safe": true}\n', encoding="utf-8")
+            outside = Path(temp) / "outside.json"
+            outside.write_text('{"external-race-marker": true}\n', encoding="utf-8")
+            replacement = root / "replacement.json"
+            replacement.write_bytes(outside.read_bytes())
+            errors: list[str] = []
+            real_open = validator.os.open
+            swapped = False
+
+            def swap_then_open(path, flags, *args, **kwargs):
+                nonlocal swapped
+                if not swapped and Path(path) == candidate:
+                    validator.os.replace(replacement, candidate)
+                    swapped = True
+                return real_open(path, flags, *args, **kwargs)
+
+            with mock.patch.object(validator.os, "open", side_effect=swap_then_open):
+                result = validator._read_regular_package_bytes(root, candidate, "metadata", errors)
+
+            self.assertIsNone(result)
+            self.assertTrue(any("changed during validation" in error for error in errors), errors)
+            self.assertNotIn("external-race-marker", "\n".join(errors))
+            self.assertNotIn(str(outside), "\n".join(errors))
 
 
 if __name__ == "__main__":
