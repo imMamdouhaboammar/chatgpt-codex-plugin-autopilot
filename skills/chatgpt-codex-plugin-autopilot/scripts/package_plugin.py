@@ -36,10 +36,11 @@ def _collect(root: Path) -> tuple[list[str], list[str]]:
         for name in sorted(dirs):
             path = current_path / name
             dir_rel = path.relative_to(root).as_posix()
+            dir_entry = dir_rel if dir_rel.endswith("/") else dir_rel + "/"
             if "\\" in dir_rel:
                 raise ValueError(f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {dir_rel}")
-            if not archive_member_path_within_limit(dir_rel):
-                raise ValueError(f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {dir_rel}")
+            if not archive_member_path_within_limit(dir_entry):
+                raise ValueError(f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {dir_entry}")
             if path.is_symlink():
                 raise ValueError(f"symlink is not packageable: {dir_rel}")
         for name in sorted(names):

@@ -50,7 +50,7 @@ def _warning(warnings: list[str], message: str) -> None:
 
 
 def archive_member_path_within_limit(path: str) -> bool:
-    return len(path) <= MAX_MEMBER_PATH
+    return len(path.encode("utf-8")) <= MAX_MEMBER_PATH
 
 
 def _load_json_bytes(data: bytes, errors: list[str], label: str = "manifest") -> dict:
@@ -1227,10 +1227,11 @@ def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Pa
                 dirs.remove(name)
                 continue
             dir_rel = path.relative_to(root).as_posix()
+            dir_entry = dir_rel if dir_rel.endswith("/") else dir_rel + "/"
             if "\\" in name:
                 _error(errors, f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {dir_rel}")
-            if not archive_member_path_within_limit(dir_rel):
-                _error(errors, f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {dir_rel}")
+            if not archive_member_path_within_limit(dir_entry):
+                _error(errors, f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {dir_entry}")
             directories.add(path)
         for name in names:
             path = current_path / name

@@ -208,18 +208,49 @@ class ValidatorRegressionTests(unittest.TestCase):
         self.assertTrue(validator.archive_member_path_within_limit("a" * 1023))
         self.assertTrue(validator.archive_member_path_within_limit("a" * 1024))
         self.assertFalse(validator.archive_member_path_within_limit("a" * 1025))
+        # Multibyte UTF-8 path where code point count <= 1024 but byte length exceeds 1024
+        multibyte_overlong = "é" * 513  # 513 characters, 1026 UTF-8 bytes
+        self.assertFalse(validator.archive_member_path_within_limit(multibyte_overlong))
 
     def test_boundary_valid_archive_member_path_passes_preflight(self):
+        validator = load_validator_module()
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
             write_fixture(root)
-            # Add a nested file with a valid multi-segment path
+            # Add a nested file with a valid multi-segment path on disk
             nested_dir = root / "assets" / ("sub_" + "x" * 40)
             nested_dir.mkdir(parents=True, exist_ok=True)
             (nested_dir / ("data_" + "y" * 40 + ".txt")).write_text("ok\n", encoding="utf-8")
             proc, report = validate(root)
             self.assertEqual(proc.returncode, 0, report)
             self.assertTrue(report.get("ok"), report)
+
+            # Test exact 1,024-character boundary file path passes validator helper and _walk
+            # 5 segments of 200 chars (1000) + 4 slashes + "file_" (5) + 10 chars + ".txt" (4) = 1024 chars
+            exact_1024 = "/".join(["d" * 200 for _ in range(5)]) + "/file_" + ("a" * 10) + ".txt"
+            self.assertEqual(len(exact_1024), 1024)
+            self.assertTrue(validator.archive_member_path_within_limit(exact_1024))
+
+    def test_directory_trailing_slash_counted_in_archive_member_path_limit(self):
+        validator = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            # A 1,024-character directory without slash becomes 1,025 with trailing slash and must be rejected
+            dir_1024 = "/".join(["d" * 200 for _ in range(5)]) + "/dir_" + ("b" * 15)
+            self.assertEqual(len(dir_1024), 1024)
+            self.assertFalse(validator.archive_member_path_within_limit(dir_1024 + "/"))
+
+            errors: list[str] = []
+            def mocked_walk_dir(top, *args, **kwargs):
+                yield str(root), [dir_1024], []
+
+            with mock.patch.object(validator.os, "walk", side_effect=mocked_walk_dir):
+                validator._walk(root, errors, [])
+            self.assertTrue(
+                any("archive_member_path_too_long" in err and dir_1024 + "/" in err for err in errors),
+                errors,
+            )
 
     def test_rejects_archive_member_path_exceeding_limit(self):
         validator = load_validator_module()
