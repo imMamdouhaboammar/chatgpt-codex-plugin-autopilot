@@ -2,7 +2,7 @@
 
 Treat uploader and review messages as evidence. Map each failure to the source that produced it, fix that source, rebuild, and rerun the complete gate. Do not patch only the final ZIP when a generator or installer will recreate the problem.
 
-This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13. Skill YAML frontmatter local preflight was re-checked against that reference on 2026-09-09.
+This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13. Skill YAML frontmatter local preflight and archive member path limits were re-checked against that reference on 2026-09-09.
 
 ## Package root and `.codex-plugin/`
 
@@ -10,7 +10,7 @@ If the uploader reports an ambiguous plugin root or wrapper siblings, package ex
 
 Only `plugin.json` belongs inside `.codex-plugin/`. Move Skills, assets, hooks, `.app.json`, and `.mcp.json` to their documented plugin-root locations.
 
-For entry-count, extracted-size, member-size, duplicate-path, normalization collision, unsupported type, or unreadable-member failures, repair the release surface at source. Reject symlinks and special files and remove generated/dev artifacts that are not runtime dependencies.
+For entry-count, extracted-size, member-size, member path length (>1,024 characters, `archive_member_path_too_long`), path depth (>20 segments, `archive_member_path_too_deep`), backslash path separators (`archive_member_path_has_backslash`), duplicate-path, normalization collision, unsupported type, or unreadable-member failures, repair the release surface at source. Reject symlinks and special files and remove generated/dev artifacts that are not runtime dependencies.
 
 ## Files directly under `skills/`
 

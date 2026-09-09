@@ -1,6 +1,6 @@
 # Official OpenAI Plugin Contract Baseline
 
-Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
+Checked against official OpenAI documentation on 2026-08-22. Skill YAML frontmatter error classes and archive member path limits were re-checked on 2026-09-09. Re-check these pages at the start of every public plugin task because package and submission rules can change:
 
 - https://developers.openai.com/plugins/concepts/plugins
 - https://developers.openai.com/plugins/concepts/skills
@@ -140,6 +140,7 @@ Current public package checks include limits for archive entries, extracted size
 - `.DS_Store`, `Thumbs.db`, AppleDouble files
 - secret-shaped configuration files
 - member names containing `\`
+- archive member paths exceeding 1,024 characters (`archive_member_path_too_long`)
 - normalization/case path collisions
 - accidental absolute local user paths
 - explicitly excluded internal capabilities

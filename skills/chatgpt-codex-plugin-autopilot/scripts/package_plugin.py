@@ -14,7 +14,11 @@ from pathlib import Path
 # Prevent transient bytecode inside the plugin root from entering deterministic archives.
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from validate_plugin import validate_plugin  # noqa: E402
+from validate_plugin import (  # noqa: E402
+    MAX_MEMBER_PATH,
+    archive_member_path_within_limit,
+    validate_plugin,
+)
 
 FIXED_TIME = (1980, 1, 1, 0, 0, 0)
 MAX_ARCHIVE = 100 * 1000 * 1000
@@ -31,15 +35,22 @@ def _collect(root: Path) -> tuple[list[str], list[str]]:
         current_path = Path(current)
         for name in sorted(dirs):
             path = current_path / name
+            dir_rel = path.relative_to(root).as_posix()
+            if "\\" in dir_rel:
+                raise ValueError(f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {dir_rel}")
+            if not archive_member_path_within_limit(dir_rel):
+                raise ValueError(f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {dir_rel}")
             if path.is_symlink():
-                raise ValueError(f"symlink is not packageable: {path.relative_to(root)}")
+                raise ValueError(f"symlink is not packageable: {dir_rel}")
         for name in sorted(names):
             path = current_path / name
-            if path.is_symlink() or not path.is_file():
-                raise ValueError(f"unsupported package member: {path.relative_to(root)}")
             rel = path.relative_to(root).as_posix()
             if "\\" in rel:
                 raise ValueError(f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {rel}")
+            if not archive_member_path_within_limit(rel):
+                raise ValueError(f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {rel}")
+            if path.is_symlink() or not path.is_file():
+                raise ValueError(f"unsupported package member: {rel}")
             files.append(rel)
             parts = rel.split("/")[:-1]
             for index in range(1, len(parts) + 1):
