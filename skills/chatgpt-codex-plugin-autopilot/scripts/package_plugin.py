@@ -59,6 +59,11 @@ def build_archive(plugin_root: str, output_path: str, exclusions: list[str] | No
     if not report["ok"]:
         raise ValueError("plugin validation failed: " + "; ".join(report["errors"]))
     directories, files = _collect(root)
+    if report["architecture"] == "skills-only":
+        for excluded in (".mcp.json", ".app.json"):
+            if excluded in files:
+                code = "mcp_configuration_excluded" if excluded == ".mcp.json" else "app_configuration_excluded"
+                raise ValueError(f"{code}: Skills-only ZIP must not include {excluded}")
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_name(output.name + ".tmp")
     try:
