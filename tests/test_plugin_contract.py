@@ -132,6 +132,24 @@ class PluginContractTests(unittest.TestCase):
         self.assertIn("SECURITY.md", support_text)
         self.assertIn("Security Vulnerabilities", support_text)
 
+    def test_conformance_matrix_and_drift_control_reference(self):
+        matrix_path = (
+            ROOT
+            / "skills"
+            / "chatgpt-codex-plugin-autopilot"
+            / "references"
+            / "conformance-matrix.md"
+        )
+        self.assertTrue(matrix_path.is_file())
+        text = matrix_path.read_text(encoding="utf-8")
+        self.assertIn("Authoritative Review Date", text)
+        self.assertIn("archive_member_path_too_long", text)
+        self.assertIn("dependencies.tools", text)
+        self.assertIn("duplicate_app_reference", text)
+        self.assertIn("mcpServers", text)
+        self.assertIn("Local Proof", text)
+        self.assertIn("Strategy A", text)
+
 
 if __name__ == "__main__":
     unittest.main()

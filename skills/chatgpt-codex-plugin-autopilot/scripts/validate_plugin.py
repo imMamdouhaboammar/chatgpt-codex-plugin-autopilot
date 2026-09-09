@@ -1267,20 +1267,26 @@ def _validate_mcp_manifest(data: dict, errors: list[str], warnings: list[str] | 
         return
     if "mcpServers" in data:
         servers = data.get("mcpServers")
+        if not isinstance(servers, dict):
+            _error(errors, "mcp_servers_wrong_type: .mcp.json mcpServers must be an object")
+            return
     elif "mcp_servers" in data:
         servers = data.get("mcp_servers")
+        if not isinstance(servers, dict):
+            _error(errors, "mcp_servers_wrong_type: .mcp.json mcp_servers must be an object")
+            return
         _warning(warnings, ".mcp.json uses legacy 'mcp_servers' wrapper; 'mcpServers' (camelCase) is preferred for Codex/OpenAI plugins")
     else:
         servers = data
     if not isinstance(servers, dict) or not servers:
-        _error(errors, ".mcp.json must contain a non-empty direct server map, mcpServers, or mcp_servers object")
+        _error(errors, "mcp_servers_missing: .mcp.json must contain a non-empty direct server map, mcpServers, or mcp_servers object")
         return
     for name, config in servers.items():
         if not isinstance(name, str) or not name.strip():
-            _error(errors, ".mcp.json server names must be non-empty strings")
+            _error(errors, "mcp_server_name_empty: .mcp.json server names must be non-empty strings")
             continue
         if not isinstance(config, dict):
-            _error(errors, f".mcp.json server config must be an object: {name}")
+            _error(errors, f"mcp_server_wrong_type: .mcp.json server config must be an object: {name}")
             continue
         has_command = "command" in config
         has_url = "url" in config
