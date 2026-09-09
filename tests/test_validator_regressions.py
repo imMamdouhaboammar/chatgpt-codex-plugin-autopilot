@@ -1,8 +1,10 @@
+import importlib.util
 import json
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 VALIDATOR = ROOT / "skills/chatgpt-codex-plugin-autopilot/scripts/validate_plugin.py"
@@ -56,6 +58,15 @@ def validate(root: Path) -> tuple[subprocess.CompletedProcess[str], dict]:
     )
     report = json.loads(proc.stdout)
     return proc, report
+
+
+def load_validator_module():
+    spec = importlib.util.spec_from_file_location("plugin_autopilot_validator", VALIDATOR)
+    if spec is None or spec.loader is None:
+        raise RuntimeError("validator module could not be loaded")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def assert_regular_file_error(test: unittest.TestCase, report: dict, declared_path: str) -> None:
@@ -198,7 +209,14 @@ class ValidatorRegressionTests(unittest.TestCase):
             agents = root / "skills" / "worker" / "agents"
             agents.mkdir()
             target = agents / "target.yaml"
-            target.write_text("policy:\n  allow_implicit_invocation: sometimes\n", encoding="utf-8")
+            target.write_text(
+                "interface:\n"
+                "  display_name: Fixture\n"
+                "  short_description: Fixture\n"
+                "policy:\n"
+                "  allow_implicit_invocation: sometimes\n",
+                encoding="utf-8",
+            )
             metadata = agents / "openai.yaml"
             metadata.symlink_to(target.name)
 
@@ -282,6 +300,71 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertNotEqual(proc.returncode, 0, report)
             assert_regular_file_error(self, report, "hooks.json")
             self.assertNotIn(str(target), json.dumps(report))
+
+    def test_control_character_asset_path_returns_json_error_instead_of_crashing(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["interface"]["logo"] = "./assets/icon\u0000.svg"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertTrue(any("control character" in error for error in report["errors"]), report)
+
+    def test_rejects_skills_path_traversal_before_outside_directory_inspection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            outside = Path(temp) / "outside"
+            outside.mkdir()
+            (outside / "escape").mkdir()
+            (outside / "escape" / "SKILL.md").write_text(
+                "---\nname: outside-skill-marker\ndescription: Must not be inspected.\n---\n\nOutside.\n",
+                encoding="utf-8",
+            )
+            manifest_path = root / ".codex-plugin" / "plugin.json"
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            manifest["skills"] = "./skills/../../outside"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+            proc, report = validate(root)
+
+            self.assertNotEqual(proc.returncode, 0, report)
+            self.assertTrue(any("manifest skills path" in error for error in report["errors"]), report)
+            self.assertNotIn("outside-skill-marker", report["skills"])
+
+    def test_verified_reader_rejects_file_replaced_by_symlink_before_open(self):
+        validator = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            root.mkdir()
+            candidate = root / "metadata.json"
+            candidate.write_text('{"safe": true}\n', encoding="utf-8")
+            outside = Path(temp) / "outside.json"
+            outside.write_text('{"external-race-marker": true}\n', encoding="utf-8")
+            errors: list[str] = []
+            real_open = validator.os.open
+            swapped = False
+
+            def swap_then_open(path, flags, *args, **kwargs):
+                nonlocal swapped
+                if not swapped and Path(path) == candidate:
+                    candidate.unlink()
+                    candidate.symlink_to(outside)
+                    swapped = True
+                return real_open(path, flags, *args, **kwargs)
+
+            with mock.patch.object(validator.os, "open", side_effect=swap_then_open):
+                result = validator._read_regular_package_bytes(root, candidate, "metadata", errors)
+
+            self.assertIsNone(result)
+            self.assertTrue(errors, errors)
+            self.assertNotIn("external-race-marker", "\n".join(errors))
+            self.assertNotIn(str(outside), "\n".join(errors))
 
 
 if __name__ == "__main__":
