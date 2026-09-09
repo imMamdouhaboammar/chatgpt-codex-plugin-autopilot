@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CI = ROOT / ".github/workflows/ci.yml"
 RELEASE = ROOT / ".github/workflows/release.yml"
+ANTI_SLOP = ROOT / ".github/workflows/anti-slop.yml"
 
 class WorkflowTests(unittest.TestCase):
     def test_ci_runs_full_self_hosting_gate_with_pinned_actions(self):
@@ -56,6 +57,14 @@ class WorkflowTests(unittest.TestCase):
         self.assertRegex(text, r"actions/upload-artifact@[0-9a-f]{40}")
         self.assertRegex(text, r"actions/download-artifact@[0-9a-f]{40}")
         self.assertIn("gh release download \"$GITHUB_REF_NAME\" --repo \"$GITHUB_REPOSITORY\" --dir dist-download", text)
+
+    def test_anti_slop_workflow_configured_safely(self):
+        self.assertTrue(ANTI_SLOP.exists())
+        text = ANTI_SLOP.read_text(encoding="utf-8")
+        self.assertIn("pull_request_target:", text)
+        self.assertIn("pull-requests: write", text)
+        self.assertIn("uses: peakoss/anti-slop@v0.3.0", text)
+        self.assertIn("max-failures: 4", text)
 
 
 if __name__ == "__main__":
