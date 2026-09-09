@@ -41,6 +41,22 @@ class WorkflowTests(unittest.TestCase):
     def test_obsolete_version_specific_release_workflow_retired(self):
         self.assertFalse((ROOT / ".github/workflows/publish-v0.3.0.yml").exists())
 
+    def test_release_enforces_least_privilege_and_provenance(self):
+        text = RELEASE.read_text(encoding="utf-8")
+        self.assertIn("permissions: {}", text)
+        self.assertIn("verify:", text)
+        self.assertIn("publish:", text)
+        self.assertIn("needs: verify", text)
+        self.assertIn("git merge-base --is-ancestor \"$GITHUB_SHA\" origin/main", text)
+        self.assertIn(
+            "python3 skills/chatgpt-codex-plugin-autopilot/scripts/build_directory_pack.py . --listing submission/listing.json --json",
+            text,
+        )
+        self.assertRegex(text, r"actions/upload-artifact@[0-9a-f]{40}")
+        self.assertRegex(text, r"actions/download-artifact@[0-9a-f]{40}")
+        self.assertIn("gh release download \"$GITHUB_REF_NAME\" --dir dist-download", text)
+
 
 if __name__ == "__main__":
     unittest.main()
+
