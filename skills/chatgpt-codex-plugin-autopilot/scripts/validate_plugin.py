@@ -18,6 +18,7 @@ MAX_ENTRIES = 5000
 MAX_TOTAL = 512 * 1024 * 1024
 MAX_MEMBER = 100 * 1024 * 1024
 MAX_IMAGE = 5 * 1024 * 1024
+MAX_MEMBER_PATH = 1024
 HEX_COLOR = re.compile(r"^#[0-9A-Fa-f]{6}$")
 SEMVER = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$")
 PLUGIN_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -46,6 +47,10 @@ def _error(errors: list[str], message: str) -> None:
 
 def _warning(warnings: list[str], message: str) -> None:
     warnings.append(message)
+
+
+def archive_member_path_within_limit(path: str) -> bool:
+    return len(path.encode("utf-8")) <= MAX_MEMBER_PATH
 
 
 def _load_json_bytes(data: bytes, errors: list[str], label: str = "manifest") -> dict:
@@ -1221,14 +1226,20 @@ def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Pa
                 _error(errors, f"symlink is not allowed in public plugin: {path.relative_to(root)}")
                 dirs.remove(name)
                 continue
+            dir_rel = path.relative_to(root).as_posix()
+            dir_entry = dir_rel if dir_rel.endswith("/") else dir_rel + "/"
             if "\\" in name:
-                _error(errors, f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {path.relative_to(root).as_posix()}")
+                _error(errors, f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {dir_rel}")
+            if not archive_member_path_within_limit(dir_entry):
+                _error(errors, f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {dir_entry}")
             directories.add(path)
         for name in names:
             path = current_path / name
             rel = path.relative_to(root).as_posix()
             if "\\" in rel:
                 _error(errors, f"archive_member_path_has_backslash: archive member path must use /, not backslashes: {rel}")
+            if not archive_member_path_within_limit(rel):
+                _error(errors, f"archive_member_path_too_long: archive member path exceeds {MAX_MEMBER_PATH} characters: {rel}")
             if rel != rel.strip():
                 _error(errors, f"archive member path has outer whitespace: {rel!r}")
             segments = rel.split("/")

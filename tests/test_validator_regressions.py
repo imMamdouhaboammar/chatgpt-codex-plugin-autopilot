@@ -202,6 +202,116 @@ class ValidatorRegressionTests(unittest.TestCase):
                 report,
             )
 
+    def test_archive_member_path_within_limit_exact_boundaries(self):
+        validator = load_validator_module()
+        self.assertEqual(validator.MAX_MEMBER_PATH, 1024)
+        self.assertTrue(validator.archive_member_path_within_limit("a" * 1023))
+        self.assertTrue(validator.archive_member_path_within_limit("a" * 1024))
+        self.assertFalse(validator.archive_member_path_within_limit("a" * 1025))
+        # Multibyte UTF-8 path where code point count <= 1024 but byte length exceeds 1024
+        multibyte_overlong = "é" * 513  # 513 characters, 1026 UTF-8 bytes
+        self.assertFalse(validator.archive_member_path_within_limit(multibyte_overlong))
+
+    def test_boundary_valid_archive_member_path_passes_preflight(self):
+        validator = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            # Add a nested file with a valid multi-segment path on disk
+            nested_dir = root / "assets" / ("sub_" + "x" * 40)
+            nested_dir.mkdir(parents=True, exist_ok=True)
+            (nested_dir / ("data_" + "y" * 40 + ".txt")).write_text("ok\n", encoding="utf-8")
+            proc, report = validate(root)
+            self.assertEqual(proc.returncode, 0, report)
+            self.assertTrue(report.get("ok"), report)
+
+            # Test exact 1,024-character boundary file path passes validator helper and _walk
+            # 5 segments of 200 chars (1000) + 4 slashes + "file_" (5) + 10 chars + ".txt" (4) = 1024 chars
+            exact_1024 = "/".join(["d" * 200 for _ in range(5)]) + "/file_" + ("a" * 10) + ".txt"
+            self.assertEqual(len(exact_1024), 1024)
+            self.assertTrue(validator.archive_member_path_within_limit(exact_1024))
+
+    def test_directory_trailing_slash_counted_in_archive_member_path_limit(self):
+        validator = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            # A 1,024-character directory without slash becomes 1,025 with trailing slash and must be rejected
+            dir_1024 = "/".join(["d" * 200 for _ in range(5)]) + "/dir_" + ("b" * 15)
+            self.assertEqual(len(dir_1024), 1024)
+            self.assertFalse(validator.archive_member_path_within_limit(dir_1024 + "/"))
+
+            errors: list[str] = []
+            def mocked_walk_dir(top, *args, **kwargs):
+                yield str(root), [dir_1024], []
+
+            with mock.patch.object(validator.os, "walk", side_effect=mocked_walk_dir):
+                validator._walk(root, errors, [])
+            self.assertTrue(
+                any("archive_member_path_too_long" in err and dir_1024 + "/" in err for err in errors),
+                errors,
+            )
+
+    def test_rejects_archive_member_path_exceeding_limit(self):
+        validator = load_validator_module()
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            # Try creating an on-disk member path of 1025 chars if host filesystem permits
+            long_subdirs = ["d" * 200 for _ in range(5)]
+            target_dir = root.joinpath(*long_subdirs)
+            target_file = target_dir / ("f" * 25 + ".txt")
+            created_on_disk = False
+            try:
+                target_dir.mkdir(parents=True, exist_ok=True)
+                target_file.write_text("overlong path\n", encoding="utf-8")
+                created_on_disk = True
+            except OSError:
+                # Host filesystem (e.g. macOS APFS with 1024 PATH_MAX or Windows MAX_PATH) does not permit
+                pass
+
+            if created_on_disk:
+                proc, report = validate(root)
+                self.assertNotEqual(proc.returncode, 0, report)
+                self.assertTrue(
+                    any("archive_member_path_too_long" in error for error in report["errors"]),
+                    report,
+                )
+            else:
+                # Alternate assertion when host OS path limit is smaller than contract
+                overlong_rel = "/".join(["d" * 100 for _ in range(10)]) + "/file_" + ("z" * 20) + ".txt"  # 1039 chars (> 1024)
+                self.assertFalse(validator.archive_member_path_within_limit(overlong_rel))
+                errors: list[str] = []
+                # Test _walk directly with mocked os.walk
+                mock_file = root / "assets" / "icon.svg"
+                def mocked_walk(top, *args, **kwargs):
+                    yield str(root), [], [overlong_rel]
+
+                with mock.patch.object(validator.os, "walk", side_effect=mocked_walk):
+                    validator._walk(root, errors, [])
+                self.assertTrue(
+                    any("archive_member_path_too_long" in err and "exceeds 1024 characters" in err for err in errors),
+                    errors,
+                )
+
+    def test_packager_rejects_archive_member_path_exceeding_limit(self):
+        packager_spec = importlib.util.spec_from_file_location("package_plugin", PACKAGER)
+        self.assertIsNotNone(packager_spec and packager_spec.loader)
+        packager = importlib.util.module_from_spec(packager_spec)
+        packager_spec.loader.exec_module(packager)
+
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp) / "plugin"
+            write_fixture(root)
+            overlong_name = "x" * 1025
+            def mocked_walk(top, *args, **kwargs):
+                yield str(root), [], [overlong_name]
+
+            with mock.patch.object(packager.os, "walk", side_effect=mocked_walk):
+                with self.assertRaises(ValueError) as ctx:
+                    packager._collect(root)
+                self.assertIn("archive_member_path_too_long", str(ctx.exception))
+
     def test_rejects_screenshots_on_skills_only_packages(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp) / "plugin"
