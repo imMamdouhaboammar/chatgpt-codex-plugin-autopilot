@@ -30,6 +30,8 @@ If CI creates GitHub Releases, CI should retrieve the already-published registry
 
 Push the release commit and immutable tag only after the registry dependency, if any, is satisfied. Verify remote commit/tag SHAs. Wait for required CI/security/release workflows and inspect their actual conclusions.
 
+The single authoritative release workflow for all versions is `.github/workflows/release.yml`, triggered on immutable `v*` tag pushes. It checks tag-to-manifest version alignment, runs full test gates and self-checks, performs two independent deterministic builds with bitwise comparison, and publishes the verified ZIP, checksums, and reviewer packet to GitHub Releases. The historical one-shot workflow `publish-v0.3.0.yml` is permanently retired.
+
 Download GitHub Release assets after publication. Compare the npm asset to the registry artifact and the plugin ZIP to the locally deterministic build. Reinspect the downloaded ZIP rather than assuming upload preserved the intended file.
 
 ## Plugin Directory
