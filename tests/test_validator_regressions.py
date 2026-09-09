@@ -691,6 +691,7 @@ class ValidatorRegressionTests(unittest.TestCase):
             self.assertTrue(any(".mcp.json" in error for error in report["errors"]), report)
 
     def test_unit_validate_mcp_manifest_shapes(self):
+        validator = load_validator_module()
         # 1. Valid local command stdio shape under mcpServers
         data_stdio = {
             "mcpServers": {
@@ -737,9 +738,9 @@ class ValidatorRegressionTests(unittest.TestCase):
         negative_cases = (
             ({}, "mcp_servers_missing"),
             ({"mcpServers": "not-a-dict"}, "mcp_servers_wrong_type"),
-            ({"mcpServers": {}}, ".mcp.json must contain a non-empty direct server map"),
-            ({"mcpServers": {"": {"command": "node"}}}, ".mcp.json server names must be non-empty strings"),
-            ({"mcpServers": {"server1": "not-an-object"}}, ".mcp.json server config must be an object"),
+            ({"mcpServers": {}}, "mcp_servers_missing"),
+            ({"mcpServers": {"": {"command": "node"}}}, "mcp_server_name_empty"),
+            ({"mcpServers": {"server1": "not-an-object"}}, "mcp_server_wrong_type"),
             ({"mcpServers": {"server1": {"description": "no command or url"}}}, "mcp_server_target_missing"),
             ({"mcpServers": {"server1": {"command": ""}}}, "mcp_server_command_invalid"),
             ({"mcpServers": {"server1": {"command": "node", "args": "not-a-list"}}}, "mcp_server_args_invalid"),
