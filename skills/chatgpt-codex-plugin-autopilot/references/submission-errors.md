@@ -2,7 +2,7 @@
 
 Treat uploader and review messages as evidence. Map each failure to the source that produced it, fix that source, rebuild, and rerun the complete gate. Do not patch only the final ZIP when a generator or installer will recreate the problem.
 
-This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13.
+This playbook was refreshed against the official OpenAI submission error reference on 2026-08-13. Skill YAML frontmatter local preflight was re-checked against that reference on 2026-09-09.
 
 ## Package root and `.codex-plugin/`
 
@@ -72,7 +72,7 @@ A path that resolves back inside the package after normalization can still be re
 
 Each Skill must be an immediate child directory of `skills/` and contain a regular readable `SKILL.md`.
 
-Validate front matter for non-empty `name` and `description`, non-empty instructions, unique Skill names, and the current combined plugin/Skill identity limit.
+Validate front matter as YAML before consuming fields. Local preflight fails closed on `skill_frontmatter_yaml_malformed`, `skill_frontmatter_wrong_type`, non-string `name`/`description`, explicit YAML tags, empty required strings, non-empty instructions, unique Skill names, and the current combined plugin/Skill identity limit. Parser errors identify the Skill directory and official failure class; they must not dump frontmatter contents or execute YAML tags.
 
 Do not require Skill metadata `name` to equal the directory slug unless current official documentation explicitly adds that requirement. They are separate concepts under the current error reference.
 

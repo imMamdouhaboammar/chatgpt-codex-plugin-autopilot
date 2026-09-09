@@ -202,7 +202,7 @@ Check at minimum:
 - public Autopilot-produced Plugins contain committed light/dark SVG variants
 - every direct child under `skills/` is a valid Skill directory
 - `host-workspace-operator` is present when the Plugin's conversion plan requires local workspace operations
-- Skill frontmatter/body/identity are valid and names are unique
+- Skill frontmatter is valid YAML (mapping with non-empty string `name` and `description`), body/identity are valid, and names are unique
 - optional `agents/openai.yaml` is valid
 - declared app/MCP files are structurally valid; undeclared root files do not alter architecture
 - package contains no secrets, bytecode, symlinks, excluded capabilities, normalization collisions, or local absolute user paths
