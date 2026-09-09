@@ -48,9 +48,9 @@ def _warning(warnings: list[str], message: str) -> None:
     warnings.append(message)
 
 
-def _load_json(path: Path, errors: list[str], label: str = "manifest") -> dict:
+def _load_json_bytes(data: bytes, errors: list[str], label: str = "manifest") -> dict:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(data.decode("utf-8"))
     except Exception as exc:
         _error(errors, f"{label} unreadable or malformed: {exc}")
         return {}
@@ -92,7 +92,7 @@ def _has_control(value: str) -> bool:
     return any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
 
 
-def _package_member_mode(
+def _package_member_stat(
     root: Path,
     path: Path,
     label: str,
@@ -100,7 +100,7 @@ def _package_member_mode(
     *,
     required: bool = True,
     missing_message: str | None = None,
-) -> int | None:
+) -> os.stat_result | None:
     try:
         relative = path.relative_to(root)
     except ValueError:
@@ -111,29 +111,49 @@ def _package_member_mode(
     for part in relative.parts[:-1]:
         current = current / part
         try:
-            mode = current.lstat().st_mode
+            member = current.lstat()
         except FileNotFoundError:
             if required:
                 _error(errors, missing_message or f"{label} parent is missing: {rel}")
             return None
-        except OSError:
+        except (OSError, ValueError):
             _error(errors, f"{label} parent is unreadable: {rel}")
             return None
-        if stat.S_ISLNK(mode):
+        if stat.S_ISLNK(member.st_mode):
             _error(errors, f"{label} parent must not be a symlink: {rel}")
             return None
-        if not stat.S_ISDIR(mode):
+        if not stat.S_ISDIR(member.st_mode):
             _error(errors, f"{label} parent must be a directory: {rel}")
             return None
     try:
-        return path.lstat().st_mode
+        return path.lstat()
     except FileNotFoundError:
         if required:
             _error(errors, missing_message or f"{label} is missing: {rel}")
         return None
-    except OSError:
+    except (OSError, ValueError):
         _error(errors, f"{label} is unreadable: {rel}")
         return None
+
+
+def _package_member_mode(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> int | None:
+    member = _package_member_stat(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    return member.st_mode if member is not None else None
 
 
 def _regular_package_file(
@@ -145,7 +165,7 @@ def _regular_package_file(
     required: bool = True,
     missing_message: str | None = None,
 ) -> bool:
-    mode = _package_member_mode(
+    member = _package_member_stat(
         root,
         path,
         label,
@@ -153,9 +173,9 @@ def _regular_package_file(
         required=required,
         missing_message=missing_message,
     )
-    if mode is None:
+    if member is None:
         return False
-    if not stat.S_ISREG(mode):
+    if not stat.S_ISREG(member.st_mode):
         rel = path.relative_to(root).as_posix()
         _error(errors, f"{label} must be a regular file: {rel}")
         return False
@@ -171,7 +191,7 @@ def _real_package_directory(
     required: bool = True,
     missing_message: str | None = None,
 ) -> bool:
-    mode = _package_member_mode(
+    member = _package_member_stat(
         root,
         path,
         label,
@@ -179,13 +199,227 @@ def _real_package_directory(
         required=required,
         missing_message=missing_message,
     )
-    if mode is None:
+    if member is None:
         return False
-    if not stat.S_ISDIR(mode):
+    if not stat.S_ISDIR(member.st_mode):
         rel = path.relative_to(root).as_posix()
         _error(errors, f"{label} must be a real directory: {rel}")
         return False
     return True
+
+
+def _same_member(before: os.stat_result, after: os.stat_result) -> bool:
+    if before.st_ino and after.st_ino:
+        return before.st_dev == after.st_dev and before.st_ino == after.st_ino
+    return (
+        stat.S_IFMT(before.st_mode) == stat.S_IFMT(after.st_mode)
+        and before.st_size == after.st_size
+        and getattr(before, "st_mtime_ns", None) == getattr(after, "st_mtime_ns", None)
+        and getattr(before, "st_ctime_ns", None) == getattr(after, "st_ctime_ns", None)
+    )
+
+
+def _open_regular_package_file(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> tuple[int, os.stat_result] | None:
+    before = _package_member_stat(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if before is None:
+        return None
+    rel = path.relative_to(root).as_posix()
+    if not stat.S_ISREG(before.st_mode):
+        _error(errors, f"{label} must be a regular file: {rel}")
+        return None
+    flags = os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except (OSError, ValueError):
+        _error(errors, f"{label} must remain a regular file while opening: {rel}")
+        return None
+    try:
+        after = os.fstat(descriptor)
+        if not stat.S_ISREG(after.st_mode) or not _same_member(before, after):
+            _error(errors, f"{label} changed during validation: {rel}")
+            os.close(descriptor)
+            return None
+        return descriptor, after
+    except OSError:
+        os.close(descriptor)
+        _error(errors, f"{label} could not be verified after opening: {rel}")
+        return None
+
+
+def _read_regular_package_bytes(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+    max_bytes: int = MAX_MEMBER,
+) -> tuple[bytes, os.stat_result] | None:
+    opened = _open_regular_package_file(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if opened is None:
+        return None
+    descriptor, member = opened
+    rel = path.relative_to(root).as_posix()
+    if member.st_size > max_bytes:
+        os.close(descriptor)
+        _error(errors, f"{label} exceeds safe read limit: {rel}")
+        return None
+    try:
+        with os.fdopen(descriptor, "rb", closefd=True) as handle:
+            data = handle.read(max_bytes + 1)
+    except OSError:
+        _error(errors, f"{label} could not be read after verification: {rel}")
+        return None
+    if len(data) > max_bytes:
+        _error(errors, f"{label} changed size during validation: {rel}")
+        return None
+    return data, member
+
+
+def _read_regular_package_text(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+    max_bytes: int = MAX_MEMBER,
+) -> str | None:
+    result = _read_regular_package_bytes(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+        max_bytes=max_bytes,
+    )
+    if result is None:
+        return None
+    data, _ = result
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        rel = path.relative_to(root).as_posix()
+        _error(errors, f"{label} must be UTF-8 text: {rel}")
+        return None
+
+
+def _verify_regular_package_file(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> bool:
+    opened = _open_regular_package_file(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if opened is None:
+        return False
+    descriptor, _ = opened
+    os.close(descriptor)
+    return True
+
+
+def _list_real_package_directory(
+    root: Path,
+    path: Path,
+    label: str,
+    errors: list[str],
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> list[str] | None:
+    before = _package_member_stat(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if before is None:
+        return None
+    rel = path.relative_to(root).as_posix()
+    if not stat.S_ISDIR(before.st_mode):
+        _error(errors, f"{label} must be a real directory: {rel}")
+        return None
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_DIRECTORY", 0)
+    try:
+        descriptor = os.open(path, flags)
+    except (OSError, ValueError):
+        _error(errors, f"{label} must remain a real directory while opening: {rel}")
+        return None
+    try:
+        after = os.fstat(descriptor)
+        if not stat.S_ISDIR(after.st_mode) or not _same_member(before, after):
+            _error(errors, f"{label} changed during validation: {rel}")
+            return None
+        if os.listdir not in os.supports_fd:
+            _error(errors, f"platform cannot safely enumerate package directory: {rel}")
+            return None
+        try:
+            return sorted(os.listdir(descriptor))
+        except OSError:
+            _error(errors, f"{label} is unreadable: {rel}")
+            return None
+    finally:
+        os.close(descriptor)
+
+
+def _load_json_package_file(
+    root: Path,
+    path: Path,
+    errors: list[str],
+    label: str = "manifest",
+    *,
+    required: bool = True,
+    missing_message: str | None = None,
+) -> dict:
+    result = _read_regular_package_bytes(
+        root,
+        path,
+        label,
+        errors,
+        required=required,
+        missing_message=missing_message,
+    )
+    if result is None:
+        return {}
+    data, _ = result
+    return _load_json_bytes(data, errors, label)
 
 
 def _relative_file_path(
@@ -208,6 +442,7 @@ def _relative_file_path(
         _error(errors, f"{field} path must not contain outer whitespace: {value!r}")
     if _has_control(value):
         _error(errors, f"{field} path contains a control character")
+        return None
     if require_dot_prefix and not value.startswith("./"):
         _error(errors, f"{field} path must start with ./: {value}")
     if value.startswith(("/", "\\")) or re.match(r"^[A-Za-z]:[\\/]", value):
@@ -280,18 +515,14 @@ def _component_path(
 
 def _validate_codex_plugin_directory(root: Path, errors: list[str]) -> None:
     directory = root / ".codex-plugin"
-    if not _real_package_directory(root, directory, ".codex-plugin directory", errors, required=False):
+    entries = _list_real_package_directory(root, directory, ".codex-plugin directory", errors, required=False)
+    if entries is None:
         return
-    try:
-        entries = sorted(directory.iterdir(), key=lambda path: path.name)
-    except OSError:
-        _error(errors, ".codex-plugin directory is unreadable")
-        return
-    for item in entries:
-        if item.name != "plugin.json":
+    for name in entries:
+        if name != "plugin.json":
             _error(
                 errors,
-                f".codex-plugin may contain plugin.json only; move or remove: .codex-plugin/{item.name}",
+                f".codex-plugin may contain plugin.json only; move or remove: .codex-plugin/{name}",
             )
 
 
@@ -327,8 +558,8 @@ def _numeric_dimension(value: str | None) -> float | None:
         return None
 
 
-def _svg_size(path: Path) -> tuple[float, float]:
-    root = ET.fromstring(path.read_text(encoding="utf-8"))
+def _svg_size(data: bytes) -> tuple[float, float]:
+    root = ET.fromstring(data.decode("utf-8"))
     if root.tag.split("}")[-1].lower() != "svg":
         raise ValueError("SVG root element must be <svg>")
     view_box = root.attrib.get("viewBox") or root.attrib.get("viewbox")
@@ -397,11 +628,9 @@ def _webp_size(data: bytes) -> tuple[int, int]:
     raise ValueError("WebP dimensions not found")
 
 
-def _image_size(path: Path) -> tuple[float, float]:
-    suffix = path.suffix.lower()
+def _image_size(suffix: str, data: bytes) -> tuple[float, float]:
     if suffix == ".svg":
-        return _svg_size(path)
-    data = path.read_bytes()
+        return _svg_size(data)
     if suffix == ".png":
         return _png_size(data)
     if suffix in {".jpg", ".jpeg"}:
@@ -418,15 +647,19 @@ def _validate_image(root: Path, field: str, value: object, errors: list[str]) ->
     candidate = _relative_file_path(root, f"interface.{field}", value, errors, required=True)
     if candidate is None:
         return
-    if not _regular_package_file(root, candidate, f"interface.{field} asset", errors):
-        return
-    if candidate.stat().st_size > MAX_IMAGE:
-        _error(errors, f"interface.{field} image exceeds 5 MiB: {value}")
-    if candidate.suffix.lower() not in {".png", ".jpg", ".jpeg", ".webp", ".svg"}:
+    suffix = candidate.suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp", ".svg"}:
         _error(errors, f"interface.{field} image format is unsupported: {value}")
         return
+    result = _read_regular_package_bytes(root, candidate, f"interface.{field} asset", errors, max_bytes=MAX_IMAGE)
+    if result is None:
+        return
+    data, member = result
+    if member.st_size > MAX_IMAGE:
+        _error(errors, f"interface.{field} image exceeds 5 MiB: {value}")
+        return
     try:
-        width, height = _image_size(candidate)
+        width, height = _image_size(suffix, data)
     except Exception as exc:
         _error(errors, f"interface.{field} image unreadable: {value}: {exc}")
         return
@@ -434,12 +667,11 @@ def _validate_image(root: Path, field: str, value: object, errors: list[str]) ->
         _error(errors, f"interface.{field} image must be square: {value}")
     if width < 48 or height < 48:
         _error(errors, f"interface.{field} image dimensions must be at least 48x48: {value}")
-    if candidate.suffix.lower() != ".svg" and (width > 4096 or height > 4096):
+    if suffix != ".svg" and (width > 4096 or height > 4096):
         _error(errors, f"interface.{field} raster dimensions exceed 4096x4096: {value}")
 
 
-def _skill_metadata(path: Path) -> tuple[str | None, str | None]:
-    text = path.read_text(encoding="utf-8")
+def _skill_metadata(text: str) -> tuple[str | None, str | None]:
     if not text.startswith("---\n"):
         return None, None
     end = text.find("\n---", 4)
@@ -502,15 +734,11 @@ def _yaml_block_fields(lines: list[str], label: str, errors: list[str]) -> dict[
     return fields
 
 
-def _validate_skill_agent_metadata(skill_dir: Path, errors: list[str], warnings: list[str]) -> None:
+def _validate_skill_agent_metadata(plugin_root: Path, skill_dir: Path, errors: list[str], warnings: list[str]) -> None:
     path = skill_dir / "agents" / "openai.yaml"
     rel = f"skills/{skill_dir.name}/agents/openai.yaml"
-    if not _regular_package_file(skill_dir, path, rel, errors, required=False):
-        return
-    try:
-        text = path.read_text(encoding="utf-8")
-    except Exception as exc:
-        _error(errors, f"{rel} unreadable: {exc}")
+    text = _read_regular_package_text(plugin_root, path, rel, errors, required=False)
+    if text is None:
         return
 
     blocks = _yaml_top_level_blocks(text, rel, errors)
@@ -536,7 +764,7 @@ def _validate_skill_agent_metadata(skill_dir: Path, errors: list[str], warnings:
                 require_dot_prefix=False,
             )
             if candidate is not None:
-                _regular_package_file(skill_dir, candidate, f"{rel} interface.{field} asset", errors)
+                _verify_regular_package_file(plugin_root, candidate, f"{rel} interface.{field} asset", errors)
 
     brand = interface.get("brand_color")
     if brand is not None and not HEX_COLOR.fullmatch(_yaml_unquote(brand)):
@@ -581,8 +809,7 @@ def _validate_skill_agent_metadata(skill_dir: Path, errors: list[str], warnings:
         )
 
 
-def _validate_app_manifest(path: Path, errors: list[str]) -> None:
-    data = _load_json(path, errors, ".app.json")
+def _validate_app_manifest(data: dict, errors: list[str]) -> None:
     if not data:
         return
     apps = data.get("apps")
@@ -608,8 +835,7 @@ def _validate_app_manifest(path: Path, errors: list[str]) -> None:
                 _error(errors, f".app.json {alias}.{field} must be true or false")
 
 
-def _validate_mcp_manifest(path: Path, errors: list[str]) -> None:
-    data = _load_json(path, errors, ".mcp.json")
+def _validate_mcp_manifest(data: dict, errors: list[str]) -> None:
     if not data:
         return
     servers = data.get("mcp_servers") if "mcp_servers" in data else data
@@ -653,17 +879,17 @@ def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Pa
             if len(segments) > 20:
                 _error(errors, f"archive member path must contain at most 20 segments: {rel}")
             try:
-                mode = path.lstat().st_mode
+                member = path.lstat()
             except OSError as exc:
                 _error(errors, f"unreadable plugin member {rel}: {exc}")
                 continue
-            if stat.S_ISLNK(mode):
+            if stat.S_ISLNK(member.st_mode):
                 _error(errors, f"symlink is not allowed in public plugin: {rel}")
                 continue
-            if not stat.S_ISREG(mode):
+            if not stat.S_ISREG(member.st_mode):
                 _error(errors, f"unsupported plugin member type: {rel}")
                 continue
-            size = path.stat().st_size
+            size = member.st_size
             files.append(path)
             total += size
             if size > MAX_MEMBER:
@@ -684,8 +910,12 @@ def _walk(root: Path, errors: list[str], exclusions: list[str]) -> tuple[list[Pa
                 if slug and (slug in Path(rel).parts or slug in rel):
                     _error(errors, f"public exclusion remains in plugin path: {slug}: {rel}")
             if size <= 1024 * 1024 and path.suffix.lower() in TEXT_SUFFIXES:
+                result = _read_regular_package_bytes(root, path, f"plugin text file {rel}", errors, max_bytes=1024 * 1024)
+                if result is None:
+                    continue
+                data, _ = result
                 try:
-                    text = path.read_text(encoding="utf-8")
+                    text = data.decode("utf-8")
                 except UnicodeDecodeError:
                     text = ""
                 if absolute_user_path.search(text):
@@ -717,16 +947,13 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
 
     _validate_codex_plugin_directory(root, errors)
     manifest_path = root / ".codex-plugin" / "plugin.json"
-    if not _regular_package_file(
+    manifest = _load_json_package_file(
         root,
         manifest_path,
-        "manifest .codex-plugin/plugin.json",
         errors,
+        "manifest",
         missing_message="missing .codex-plugin/plugin.json",
-    ):
-        manifest: dict = {}
-    else:
-        manifest = _load_json(manifest_path, errors)
+    )
 
     name = manifest.get("name")
     if not isinstance(name, str) or not PLUGIN_NAME.fullmatch(name):
@@ -749,11 +976,13 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
     mcp_declared = _component_path(root, manifest, "mcpServers", ".mcp.json", errors) if "mcpServers" in manifest else False
     apps_declared = _component_path(root, manifest, "apps", ".app.json", errors) if "apps" in manifest else False
     if mcp_declared:
-        _validate_mcp_manifest(root / ".mcp.json", errors)
+        mcp_data = _load_json_package_file(root, root / ".mcp.json", errors, ".mcp.json")
+        _validate_mcp_manifest(mcp_data, errors)
     elif "mcpServers" not in manifest and (root / ".mcp.json").exists():
         _warning(warnings, "root .mcp.json is ignored because manifest mcpServers is not set to ./.mcp.json")
     if apps_declared:
-        _validate_app_manifest(root / ".app.json", errors)
+        app_data = _load_json_package_file(root, root / ".app.json", errors, ".app.json")
+        _validate_app_manifest(app_data, errors)
     elif "apps" not in manifest and (root / ".app.json").exists():
         _warning(warnings, "root .app.json is ignored because manifest apps is not set to ./.app.json")
 
@@ -762,7 +991,7 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
         if isinstance(hook_value, str):
             hook_path = _relative_file_path(root, "manifest hooks", hook_value, errors)
             if hook_path is not None:
-                _regular_package_file(
+                _verify_regular_package_file(
                     root,
                     hook_path,
                     "manifest hooks file",
@@ -774,7 +1003,7 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
                 if isinstance(item, str):
                     hook_path = _relative_file_path(root, f"manifest hooks[{index}]", item, errors)
                     if hook_path is not None:
-                        _regular_package_file(
+                        _verify_regular_package_file(
                             root,
                             hook_path,
                             f"manifest hooks[{index}] file",
@@ -791,76 +1020,83 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
     has_skills = False
     skills: list[str] = []
     skill_names: set[str] = set()
+    skill_root: Path | None = None
     if isinstance(skill_path_value, str):
         if not skill_path_value:
             _error(errors, "manifest skills must be a non-empty relative path string")
-            skill_root = root / "__invalid__"
         else:
+            invalid_skill_path = False
+            if skill_path_value != skill_path_value.strip() or _has_control(skill_path_value):
+                _error(errors, "manifest skills path contains unsupported whitespace or control characters")
+                invalid_skill_path = True
             if not skill_path_value.startswith("./"):
                 _error(errors, f"manifest skills path must start with ./: {skill_path_value}")
+                invalid_skill_path = True
             relative = skill_path_value[2:] if skill_path_value.startswith("./") else skill_path_value
+            normalized = relative.replace("\\", "/")
+            if ".." in normalized.split("/"):
+                _error(errors, f"manifest skills path contains unsafe .. traversal: {skill_path_value}")
+                invalid_skill_path = True
             if relative.rstrip("/") != "skills":
                 _error(errors, f"manifest skills path must resolve to ./skills/: {skill_path_value}")
-            skill_root = root / relative
-            try:
-                skill_root.relative_to(root)
-            except ValueError:
-                _error(errors, f"manifest skills path escapes plugin root: {skill_path_value}")
-                skill_root = root / "__invalid__"
+                invalid_skill_path = True
+            if not invalid_skill_path:
+                skill_root = root / "skills"
 
-        if _real_package_directory(
-            root,
-            skill_root,
-            "manifest skills directory",
-            errors,
-            required="skills" in manifest,
-            missing_message=f"manifest skills path is missing: {skill_path_value}",
-        ):
-            for item in sorted(skill_root.iterdir(), key=lambda child: child.name):
-                if item.is_symlink() or not item.is_dir():
-                    _error(errors, f"skills direct child must be a real directory containing SKILL.md; found: skills/{item.name}")
-                    continue
-                directory = item
-                if directory.name.startswith("."):
-                    _error(errors, f"skill directory must not be hidden: {directory.name}")
-                    continue
-                definition = directory / "SKILL.md"
-                if not _regular_package_file(
-                    root,
-                    definition,
-                    "skill definition",
-                    errors,
-                    missing_message=f"skill directory is missing SKILL.md: {directory.name}",
-                ):
-                    continue
-                try:
-                    skill_name, skill_description = _skill_metadata(definition)
-                except Exception as exc:
-                    _error(errors, f"skill definition unreadable: {directory.name}: {exc}")
-                    continue
-                if not skill_name:
-                    _error(errors, f"skill name is required: {directory.name}")
-                elif skill_name in skill_names:
-                    _error(errors, f"skill name must be unique within plugin: {skill_name}")
-                else:
-                    skill_names.add(skill_name)
-                    skills.append(skill_name)
-                if not skill_description:
-                    _error(errors, f"skill description is required: {directory.name}")
-                elif len(skill_description) > 1024:
-                    _error(errors, f"skill description exceeds 1024 characters: {directory.name}")
-                try:
-                    skill_text = definition.read_text(encoding="utf-8")
+        if skill_root is not None:
+            entries = _list_real_package_directory(
+                root,
+                skill_root,
+                "manifest skills directory",
+                errors,
+                required="skills" in manifest,
+                missing_message=f"manifest skills path is missing: {skill_path_value}",
+            )
+            if entries is not None:
+                for item_name in entries:
+                    item = skill_root / item_name
+                    member = _package_member_stat(root, item, f"skill entry skills/{item_name}", errors)
+                    if member is None or not stat.S_ISDIR(member.st_mode):
+                        _error(errors, f"skills direct child must be a real directory containing SKILL.md; found: skills/{item_name}")
+                        continue
+                    directory = item
+                    if directory.name.startswith("."):
+                        _error(errors, f"skill directory must not be hidden: {directory.name}")
+                        continue
+                    definition = directory / "SKILL.md"
+                    skill_text = _read_regular_package_text(
+                        root,
+                        definition,
+                        "skill definition",
+                        errors,
+                        missing_message=f"skill directory is missing SKILL.md: {directory.name}",
+                    )
+                    if skill_text is None:
+                        continue
+                    try:
+                        skill_name, skill_description = _skill_metadata(skill_text)
+                    except Exception as exc:
+                        _error(errors, f"skill definition unreadable: {directory.name}: {exc}")
+                        continue
+                    if not skill_name:
+                        _error(errors, f"skill name is required: {directory.name}")
+                    elif skill_name in skill_names:
+                        _error(errors, f"skill name must be unique within plugin: {skill_name}")
+                    else:
+                        skill_names.add(skill_name)
+                        skills.append(skill_name)
+                    if not skill_description:
+                        _error(errors, f"skill description is required: {directory.name}")
+                    elif len(skill_description) > 1024:
+                        _error(errors, f"skill description exceeds 1024 characters: {directory.name}")
                     front_end = skill_text.find("\n---", 4)
                     body = skill_text[front_end + 4:].strip() if front_end >= 0 else ""
                     if not body:
                         _error(errors, f"skill body must not be empty: {directory.name}")
-                except Exception as exc:
-                    _error(errors, f"skill body unreadable: {directory.name}: {exc}")
-                if isinstance(name, str) and skill_name and len(f"{name}:{skill_name}") > 64:
-                    _error(errors, f"combined plugin and skill identity exceeds 64 characters: {skill_name}")
-                _validate_skill_agent_metadata(directory, errors, warnings)
-            has_skills = bool(skills)
+                    if isinstance(name, str) and skill_name and len(f"{name}:{skill_name}") > 64:
+                        _error(errors, f"combined plugin and skill identity exceeds 64 characters: {skill_name}")
+                    _validate_skill_agent_metadata(root, directory, errors, warnings)
+                has_skills = bool(skills)
     else:
         _error(errors, "manifest skills must be a relative path string")
 
@@ -933,7 +1169,7 @@ def validate_plugin(plugin_root: str, exclusions: list[str] | None = None) -> di
             for index, screenshot in enumerate(screenshots):
                 candidate = _relative_file_path(root, f"interface.screenshots[{index}]", screenshot, errors, require_dot_prefix=True)
                 if candidate is not None:
-                    _regular_package_file(root, candidate, f"interface.screenshots[{index}] asset", errors)
+                    _verify_regular_package_file(root, candidate, f"interface.screenshots[{index}] asset", errors)
 
     files, entry_count, total_bytes = _walk(root, errors, exclusions)
     if not exclusions:
