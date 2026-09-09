@@ -13,7 +13,8 @@ REVIEWER_PACKET = ROOT / "submission" / "reviewer-packet.json"
 class SandboxPythonSkillTests(unittest.TestCase):
     def test_plugin_version_and_capability_include_sandbox_python(self):
         manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-        self.assertEqual(manifest["version"], "0.5.0")
+        # Version is managed in plugin.json and validated by tag-parity in CI.
+        self.assertRegex(manifest["version"], r"^\d+\.\d+\.\d+$")
         self.assertIn("Sandbox Python execution", manifest["interface"]["capabilities"])
 
     def test_sandbox_python_skill_is_packaged_and_discoverable(self):

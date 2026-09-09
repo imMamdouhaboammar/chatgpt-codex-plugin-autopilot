@@ -12,7 +12,9 @@ class PluginContractTests(unittest.TestCase):
     def test_manifest_declares_standalone_skill_only_plugin(self):
         data = json.loads(MANIFEST.read_text(encoding="utf-8"))
         self.assertEqual(data["name"], "chatgpt-codex-plugin-autopilot")
-        self.assertEqual(data["version"], "0.5.0")
+        # Version is managed in plugin.json and validated by tag-parity in CI.
+        # Do not hardcode version strings in tests.
+        self.assertRegex(data["version"], r"^\d+\.\d+\.\d+$")
         self.assertEqual(data["skills"], "./skills/")
         self.assertNotIn("mcpServers", data)
         self.assertNotIn("apps", data)

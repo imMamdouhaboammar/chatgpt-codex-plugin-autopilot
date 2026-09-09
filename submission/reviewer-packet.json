@@ -6,7 +6,7 @@
   "note": "Repository-maintained reviewer packet for preparing the OpenAI plugin submission form. This is not an OpenAI upload schema.",
   "plugin": {
     "name": "chatgpt-codex-plugin-autopilot",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "architecture": "skills-only",
     "displayName": "Plugin Autopilot",
     "developerName": "Mamdouh Aboammar",
@@ -158,5 +158,5 @@
     "required": true,
     "status": "verify-in-openai-platform"
   },
-  "releaseNotes": "Plugin Autopilot 0.5.0 is a self-hosting ChatGPT/Codex Plugin that adds a canonical host-workspace-operator for read/list/search/grep/write/patch/shell/Python workflows, a host-native Python execution policy, a deterministic workspace Skill installer for generated Plugins, and reviewer coverage for tool availability and mutation boundaries while retaining Repo-to-Plugin conversion, branding, listing, validation, and deterministic packaging gates."
+  "releaseNotes": "Plugin Autopilot 0.5.1 hardens the release workflow with least-privilege job permissions, commit-provenance verification, and full gate parity between CI and release pipelines. Also improves test quality by removing fragile hardcoded version assertions in favour of semver-format validation that survives future version bumps without test failures."
 }
