@@ -26,6 +26,18 @@ inputs:
     description: 'Generate markdown summary in GitHub Step Summary'
     required: false
     default: 'true'
+  create-pr:
+    description: 'Automatically open a Pull Request with scaffolded plugin structure after analysis'
+    required: false
+    default: 'false'
+  pr-title:
+    description: 'Custom title for the auto-created Pull Request'
+    required: false
+    default: '🤖 [Plugin Autopilot] Scaffold ChatGPT/Codex plugin structure'
+  pr-branch:
+    description: 'Custom branch name for the auto-created Pull Request (leave empty for auto-generated)'
+    required: false
+    default: ''
 
 outputs:
   ok:
@@ -43,6 +55,12 @@ outputs:
   sha256:
     description: 'SHA-256 digest of the built ZIP archive (if packaged)'
     value: ${{ steps.autopilot.outputs.sha256 }}
+  pr-url:
+    description: 'URL of the automatically opened Pull Request (if create-pr is true)'
+    value: ${{ steps.autopilot.outputs.pr_url }}
+  pr-number:
+    description: 'Number of the automatically opened Pull Request (if create-pr is true)'
+    value: ${{ steps.autopilot.outputs.pr_number }}
 
 runs:
   using: 'composite'
@@ -55,6 +73,10 @@ runs:
         INPUT_OUTPUT_DIR: ${{ inputs.output-dir }}
         INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
         INPUT_SUMMARY: ${{ inputs.summary }}
+        INPUT_CREATE_PR: ${{ inputs.create-pr }}
+        INPUT_PR_TITLE: ${{ inputs.pr-title }}
+        INPUT_PR_BRANCH: ${{ inputs.pr-branch }}
         ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ github.token }}
       run: |
         python3 "${ACTION_PATH}/scripts/action_entrypoint.py"

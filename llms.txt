@@ -1,5 +1,5 @@
 # llms.txt — Machine-readable index for LLM agents
-# chatgpt-codex-plugin-autopilot v0.7.0
+# chatgpt-codex-plugin-autopilot v0.8.0
 # Copyright (c) 2026 Mamdouh Aboammar — MIT License
 # https://github.com/imMamdouhaboammar/chatgpt-codex-plugin-autopilot
 # Standard: https://llmstxt.org

@@ -6,7 +6,7 @@
   "note": "Repository-maintained reviewer packet for preparing the OpenAI plugin submission form. This is not an OpenAI upload schema.",
   "plugin": {
     "name": "chatgpt-codex-plugin-autopilot",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "architecture": "skills-only",
     "displayName": "Plugin Autopilot",
     "developerName": "Mamdouh Aboammar",

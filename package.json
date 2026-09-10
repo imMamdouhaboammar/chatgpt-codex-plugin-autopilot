@@ -1,6 +1,6 @@
 {
   "name": "chatgpt-codex-plugin-autopilot",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Self-hosting ChatGPT/Codex Plugin autopilot — find agentic workflows, compile Skills, package, validate, and release verified plugins",
   "author": {
     "name": "Mamdouh Aboammar",

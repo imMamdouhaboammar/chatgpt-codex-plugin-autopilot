@@ -105,8 +105,58 @@ jobs:
 
 ### Inputs & Outputs
 
-- **Inputs:** `path` (default: `.`), `action` (default: `auto`), `output-dir` (default: `dist`), `fail-on-error` (default: `true`), `summary` (default: `true`).
-- **Outputs:** `ok` (`true`/`false`), `architecture` (`skills-only` \| `mcp-backed` \| `hybrid`), `skills-count`, `plugin-path`, `sha256`.
+- **Inputs:**
+  - `path`: Target repository or plugin directory (default: `.`)
+  - `action`: Mode to execute: `auto` | `analyze` | `validate` | `package` | `build-directory-pack` (default: `auto`)
+  - `create-pr`: Automatically scaffold plugin files and open a Pull Request when running in analyze mode (default: `false`)
+  - `pr-title`: Title for the scaffold Pull Request (default: `🤖 [Plugin Autopilot] Scaffold ChatGPT/Codex plugin structure`)
+  - `pr-branch`: Custom branch name for the PR (default: auto-generated `plugin-autopilot/scaffold-<timestamp>`)
+  - `output-dir`: Directory for packaged release archives (default: `dist`)
+  - `fail-on-error`: Halt workflow step on validation errors (default: `true`)
+  - `summary`: Output rich markdown summary to GitHub Step Summary (default: `true`)
+
+- **Outputs:**
+  - `ok`: `true` if operation completed successfully without errors
+  - `architecture`: Detected architecture (`skills-only` | `mcp-backed` | `hybrid`)
+  - `skills-count`: Number of discovered or validated skills
+  - `plugin-path`: Path to built release ZIP archive
+  - `sha256`: SHA-256 digest of release package
+  - `pr-url`: Web URL of opened Pull Request (when `create-pr: true`)
+  - `pr-number`: Issue/PR number of opened Pull Request
+
+### 🤖 Auto-Scaffold Pull Requests (`create-pr: true`)
+
+When integrated into any repository with agentic skills, prompts, or workflows, Plugin Autopilot can automatically inspect your codebase and open a Pull Request ready for review:
+
+```yaml
+# .github/workflows/autopilot-scaffold.yml
+name: Scaffold ChatGPT / Codex Plugin
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  scaffold:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Autopilot Scaffold PR
+        uses: imMamdouhaboammar/chatgpt-codex-plugin-autopilot@v0.8.0
+        with:
+          create-pr: true
+```
+
+The auto-generated PR will include:
+1. `.codex-plugin/plugin.json`: Plugin manifest derived from repository discovery.
+2. `assets/`: Valid SVG brand logos (`logo-light.svg`, `logo-dark.svg`, `mark.svg`).
+3. `submission/listing.json`: Directory listing packet for ChatGPT / Codex submission.
+4. `skills/`: Reusable agent skills compiled from discovered workflow candidates.
+5. `.github/workflows/codex-plugin.yml`: Automated CI/CD pipeline to validate and package future plugin releases.
 
 ## The 0.6 flow
 

@@ -7,7 +7,7 @@ This document captures the OmniSkill SkillSpec for this Plugin, documenting trig
 | Field | Value |
 |---|---|
 | **Name** | `chatgpt-codex-plugin-autopilot` |
-| **Version** | 0.7.0 |
+| **Version** | 0.8.0 |
 | **Author** | Mamdouh Aboammar |
 | **License** | MIT |
 | **OmniSkill mode** | PACKAGE + DISTRIBUTE + VALIDATE |
@@ -142,4 +142,4 @@ All commands must exit 0. ZIP builds must be bitwise identical.
 
 ---
 
-*Last updated: v0.7.0 — © 2026 Mamdouh Aboammar — MIT License*
+*Last updated: v0.8.0 — © 2026 Mamdouh Aboammar — MIT License*

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# chatgpt-codex-plugin-autopilot v0.7.0
+# chatgpt-codex-plugin-autopilot v0.8.0
 # Copy-in bootstrap: copies the complete, verified Plugin Autopilot engine into any repository.
 # From that point on, the kit is yours — no external dependency at runtime.
 # Edit the config, rename things, delete a skill you don't need.
